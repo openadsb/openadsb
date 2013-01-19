@@ -1,0 +1,465 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"><head>
+<title>Radar Basics</title>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta http-equiv="content-language" content="en">
+<meta name="DC.Publisher" content="Dipl.-Ing. (FH) Christian Wolff">
+<meta name="Author" content="Dipl.-Ing. (FH) Christian Wolff">
+<meta name="Copyright" content="Copyright 1996 - 2011 by Christian Wolff">
+<meta name="Description" content="Allocation of 24-Bit aircraft addresses to states corresponding to ICAO Annex 10 Volume III Chapter 9">
+<meta name="Keywords" content="SSR,IFF,secondary radar,ModeS,mode S,interrogator,transponder,squitter">
+<meta http-equiv="Content-Script-Type" content="text/javascript">
+<meta http-equiv="Content-Style-Type" content="text/css">
+<link rel="shortcut icon" type="image/x-icon" href="http://www.radartutorial.eu/style/css/images/favicon.ico">
+<link rel="stylesheet" type="text/css" href="ICAO_address_allocation_by_country_files/printer.css" title="default" media="print">
+<link rel="stylesheet" type="text/css" href="ICAO_address_allocation_by_country_files/screen.css" title="default" media="screen and (min-width: 799px)">
+<link rel="stylesheet" type="text/css" href="ICAO_address_allocation_by_country_files/handheld.css" media="screen and (max-width: 799px)">
+<link rel="stylesheet" type="text/css" href="ICAO_address_allocation_by_country_files/dropdown.css" media="screen">
+<link rel="stylesheet" type="text/css" href="ICAO_address_allocation_by_country_files/default.css" media="screen">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="index,follow">
+</head>
+
+<body data-twttr-rendered="true" id="this">
+
+
+<a href="http://www.radartutorial.eu/index.en.html" id="sol" title="Home"></a>
+<h1 id="h_line"><img src="ICAO_address_allocation_by_country_files/icon_ppi.gif" alt="www." height="30" width="32"> Radartutorial .eu</h1>
+
+<!-- Navigation -->
+
+<div class="hh_yes" id="smsc"><!-- Mini-Navigation for Handhelds -->
+  <a href="http://www.radartutorial.eu/13.ssr/sr20.en.html" id="hhzur" title="back"></a>
+  <a href="http://www.radartutorial.eu/index.en.html" id="hhhome" title="home"></a>
+  <a href="http://www.radartutorial.eu/05.bistatic/bs02.en.html" id="hhcont" title="table of content"></a>
+  <span id="hhvor1" title="next"></span>
+</div>
+
+<ul id="nav" class="dropdown dropdown-horizontal">
+	<li class="vz">			<a href="http://www.radartutorial.eu/13.ssr/sr20.en.html" id="zur" title="previous page"></a></li>
+
+<li id="n-basics"><a href="http://www.radartutorial.eu/01.basics/rb02.en.html" class="dir" tabindex="2">Basics</a>
+    <ul><li>				<a href="http://www.radartutorial.eu/04.history/hi04.en.html">Historical Overview</a></li>
+	<li>				<a href="http://www.radartutorial.eu/01.basics/rb04.en.html">Physical Bases of Radar</a></li>
+	<li>				<a href="http://www.radartutorial.eu/01.basics/rb05.en.html">Radar Basic Principle</a></li>
+	<li>				<a href="http://www.radartutorial.eu/01.basics/rb06.en.html" class="dir">Principle of Measurement</a>
+	    <ul><li class="first">		<a href="http://www.radartutorial.eu/01.basics/rb07.en.html">Distance-determination</a></li>
+		<li>				<a href="http://www.radartutorial.eu/01.basics/rb08.en.html">Direction-determination</a></li>
+		<li>				<a href="http://www.radartutorial.eu/01.basics/rb09.en.html">Maximum Unambiguous Range</a></li>
+		<li>				<a href="http://www.radartutorial.eu/01.basics/rb10.en.html">Minimal Measuring Range</a></li>
+		<li>				<a href="http://www.radartutorial.eu/01.basics/rb11.en.html">Elevation Angle</a></li>
+		<li>				<a href="http://www.radartutorial.eu/01.basics/rb18.en.html">Range Resolution</a></li>
+		<li>				<a href="http://www.radartutorial.eu/01.basics/rb17.en.html">Accuracy</a></li>
+	    </ul></li>
+	<li>				<span class="dir">Radar timing performance</span>
+	    <ul><li class="first">		<a href="http://www.radartutorial.eu/18.explanations/ex36.en.html">Pulse Repetition Frequency</a></li>
+		<li>				<a href="http://www.radartutorial.eu/18.explanations/ex28.en.html">Duty Cycle</a></li>
+		<li>				<a href="http://www.radartutorial.eu/01.basics/rb21.en.html">Dwell Time/ Hits per Scan</a></li>
+		<li>				<a href="http://www.radartutorial.eu/01.basics/rb22.en.html">Time Consideration of Pulse Radar</a></li>
+	    </ul></li>
+	<li>				<span class="dir">The Radar Equation</span>
+	    <ul><li class="first">		<a href="http://www.radartutorial.eu/18.explanations/ex44.en.html">Derivation of Free-Space Path Loss</a></li>
+		<li>				<a href="http://www.radartutorial.eu/01.basics/rb13.en.html">Derivation of the Radar Equation</a></li>
+		<li>				<a href="http://www.radartutorial.eu/18.explanations/ex09.en.html">Radar Cross Section</a></li>
+		<li>				<a href="http://www.radartutorial.eu/18.explanations/ex25.en.html">Radar Loss Budget</a></li>
+		<li>				<a href="http://www.radartutorial.eu/01.basics/rb14.en.html">Exemplary Calculations</a></li>
+	    </ul></li>
+        <li>				<a href="http://www.radartutorial.eu/07.waves/wa04.en.html">Radar Frequency Bands</a></li>
+        <li>				<a href="http://www.radartutorial.eu/16.eccm/ja01.en.html">Electronic Warfare</a></li>
+   </ul>
+</li>
+
+
+<li id="n-sets"><a href="http://www.radartutorial.eu/02.basics/rp02.en.html" class="dir" tabindex="3">Radar Sets</a>
+    <ul><li>				<span class="dir">Classification of Radar systems</span>
+	    <ul><li class="first">	<a href="http://www.radartutorial.eu/02.basics/rp04.en.html" class="dir">Depending on Technologies</a>
+		    <ul><li class="first">	<a href="http://www.radartutorial.eu/01.basics/rb05.en.html">Primary Radar</a></li>
+		 	<li>			<a href="http://www.radartutorial.eu/13.ssr/sr01.en.html">Secondary Radar</a></li>
+			<li>			<a href="http://www.radartutorial.eu/02.basics/rp06.en.html">Continous Wave (CW) Radar</a></li>
+			<li>			<a href="http://www.radartutorial.eu/02.basics/rp07.en.html">Frequency Modulated CW Radar (FMCW)</a></li>
+			<li>			<a href="http://www.radartutorial.eu/05.bistatic/bs04.en.html">Bistatic Radar</a></li>
+			<li>			<a href="http://www.radartutorial.eu/20.airborne/ab06.en.html">Sidelooking Airborne Radar</a></li>
+		    </ul></li>
+		<li>			<a href="http://www.radartutorial.eu/02.basics/rp08.en.html" class="dir">Depending on Designed Use</a>
+		    <ul><li class="first">	<a href="http://www.radartutorial.eu/02.basics/rp11.en.html">Air Defense Radar</a></li>
+			<li>			<a href="http://www.radartutorial.eu/02.basics/rp09.en.html">Air Traffic Control Radar</a></li>
+		    </ul></li>
+	        <li class="first">		<a href="http://www.radartutorial.eu/15.weather/wx01.en.html" class="dir">Weather Radar</a>
+		    <ul><li class="first">		<a href="http://www.radartutorial.eu/15.weather/wx04.en.html">Principle of Operation</a></li>
+			<li>				<a href="http://www.radartutorial.eu/15.weather/wx05.en.html">Adaptation of the Radar Equation</a></li>
+			<li>				<a href="http://www.radartutorial.eu/15.weather/wx23.en.html">Polarimetric Radar</a></li>
+			<li>				<a href="http://www.radartutorial.eu/15.weather/wx06.en.html">Types of Weather</a></li>
+			<li>				<a href="http://www.radartutorial.eu/15.weather/wx19.en.html">Bright Band</a></li>
+		    </ul></li>
+	   </ul></li>
+	<li>				<a href="http://www.radartutorial.eu/19.kartei/ka03.en.html">Radar Sets (Examples given)</a></li>
+	<li class="first">		<span class="dir">Didactic Radars</span>
+	    <ul><li class="first">		<a href="http://www.radartutorial.eu/02.basics/rp21.en.html">CW-Radar</a></li>
+		<li>				<a href="http://www.radartutorial.eu/02.basics/rp22.en.html">FMCW-Radar</a></li>
+		<li>				<a href="http://www.radartutorial.eu/02.basics/rp20.en.html">Pulse Radar DPR–886</a></li>
+	    </ul></li>
+   </ul>
+</li>
+
+
+<li id="n-modes"><a href="http://www.radartutorial.eu/05.bistatic/bs02.en.html" class="dir" tabindex="4">Radartechnology</a>
+    <ul><li class="first">		<span class="dir">Frequency Diversity Radar</span>
+	<ul><li class="first">		<a href="http://www.radartutorial.eu/01.basics/rb15.en.html">Functional block diagram</a></li>
+		<li>				<a href="http://www.radartutorial.eu/18.explanations/ex23.en.html">Fluctuation Loss</a></li>
+		<li>				<a href="http://www.radartutorial.eu/01.basics/rb16.en.html">Adaptation of the Radar Equation</a></li>
+	   </ul></li>
+	<li>				<a href="http://www.radartutorial.eu/15.weather/wx23.en.html">Polarimetric Radar</a></li>
+	<li>				<a href="http://www.radartutorial.eu/08.transmitters/tx17.en.html">Intrapulse Modulation</a></li>
+	<li>				<a href="http://www.radartutorial.eu/20.airborne/ab07.en.html">Synthetic Aperture Radar</a></li>
+
+	<li>				<a href="http://www.radartutorial.eu/13.ssr/sr01.en.html" class="dir">Secondary Radar</a>
+	    <ul><li class="first">		<a href="http://www.radartutorial.eu/13.ssr/sr04.en.html">Functional Block Diagram</a></li>
+		<li>				<a href="http://www.radartutorial.eu/13.ssr/sr05.en.html" class="dir">Mode A/C</a>
+		    <ul><li class="first">		<a href="http://www.radartutorial.eu/13.ssr/sr06.en.html">Mode A/C Uplink Formats</a></li>
+			<li>				<a href="http://www.radartutorial.eu/13.ssr/sr07.en.html">Reply (Downlink) Format</a></li>
+			<li>				<a href="http://www.radartutorial.eu/13.ssr/sr09.en.html">Side Lobe Suppression</a></li>
+			<li>				<a href="http://www.radartutorial.eu/13.ssr/sr14.en.html">Fruit</a></li>
+			<li>				<a href="http://www.radartutorial.eu/13.ssr/sr15.en.html">Garbling</a></li>
+		   </ul></li>
+		<li>				<a href="http://www.radartutorial.eu/13.ssr/sr20.en.html" class="dir">Mode S</a>
+		    <ul><li class="first">		<a href="http://www.radartutorial.eu/13.ssr/sr21.en.html">Mode S Interrogations</a></li>
+			<li>				<a href="http://www.radartutorial.eu/13.ssr/sr22.en.html">Individually Mode S Interrogation</a></li>
+			<li>				<a href="http://www.radartutorial.eu/13.ssr/sr23.en.html">Differential Phase Shift Keying (DPSK)</a></li>
+			<li>				<a href="http://www.radartutorial.eu/13.ssr/sr24.en.html">Reply Formats</a></li>
+			<li>				<a href="http://www.radartutorial.eu/13.ssr/sr25.en.html">Squitter Mode</a></li>
+		   </ul></li>
+		<li>				<a href="http://www.radartutorial.eu/13.ssr/sr17.en.html">Transponder</a></li>
+	   </ul></li>
+   </ul>
+</li>
+
+
+<li id="n-devices"><a href="http://www.radartutorial.eu/06.antennas/an02.en.html" class="dir" tabindex="5">Radar Devices</a>
+    <ul><li class="first">		<a href="http://www.radartutorial.eu/06.antennas/an01.en.html" class="dir">Antenna</a>
+	<ul>	<li class="first">		<a href="http://www.radartutorial.eu/06.antennas/an05.en.html">Characteristics</a></li>
+		<li>				<a href="http://www.radartutorial.eu/06.antennas/an10.en.html">Parabolic Dish Antenna</a></li>
+		<li>				<a href="http://www.radartutorial.eu/06.antennas/an12.en.html">Cosecant Squared Pattern</a></li>
+		<li>				<a href="http://www.radartutorial.eu/06.antennas/an13.en.html">Cassegrain Antenna</a></li>
+		<li>				<span class="dir">Phased Array Antenna</span>
+	  	    <ul><li class="first">		<a href="http://www.radartutorial.eu/06.antennas/an14.en.html">Principle of Operation</a></li>
+			<li>				<a href="http://www.radartutorial.eu/06.antennas/an15.en.html">Feeding Systems</a></li>
+			<li>				<a href="http://www.radartutorial.eu/06.antennas/an53.en.html">Crow's-Nest Antenna</a></li>
+			<li>				<a href="http://www.radartutorial.eu/06.antennas/an16.en.html">Phase Shifter Devices</a></li>
+	  		    </ul></li>
+		<li>				<a href="http://www.radartutorial.eu/06.antennas/an17.en.html">Monopulse Antenna</a></li>
+		<li>				<a href="http://www.radartutorial.eu/06.antennas/an18.en.html">Duplexer</a></li>
+		<li>				<a href="http://www.radartutorial.eu/06.antennas/an26.en.html">Diplexer</a></li>
+	</ul></li>
+	<li>				<a href="http://www.radartutorial.eu/08.transmitters/tx01.en.html" class="dir">Transmitter</a>
+	    <ul><li>				<a href="http://www.radartutorial.eu/08.transmitters/tx04.en.html">Overview</a></li>
+		<li class="first">		<span class="dir">Coherent-on-Receive Radar</span>
+		    <ul><li class="first">		<a href="http://www.radartutorial.eu/08.transmitters/tx05.en.html">Functional Block Diagram</a></li>
+			<li>				<a href="http://www.radartutorial.eu/08.transmitters/tx06.en.html">Modulator</a></li>
+			<li>				<a href="http://www.radartutorial.eu/08.transmitters/tx07.en.html">Thyratron</a></li>
+			<li>				<a href="http://www.radartutorial.eu/08.transmitters/tx08.en.html">Magnetron</a></li>
+		    </ul></li>
+		<li>				<span class="dir">Coherent Radar</span>
+		    <ul><li class="first">		<a href="http://www.radartutorial.eu/11.coherent/co05.en.html">Concept of Coherence</a></li>
+			<li>				<a href="http://www.radartutorial.eu/08.transmitters/tx10.en.html">Functional Block Diagram</a></li>
+			<li>				<a href="http://www.radartutorial.eu/08.transmitters/tx11.en.html">Cross-Field Amplifier</a></li>
+			<li>				<a href="http://www.radartutorial.eu/08.transmitters/tx12.en.html">Klystron</a></li>
+			<li>				<a href="http://www.radartutorial.eu/08.transmitters/tx09.en.html">Extended Interactive Klystron</a></li>
+			<li>				<a href="http://www.radartutorial.eu/08.transmitters/tx13.en.html">Travelling Wave Tube</a></li>
+			<li>				<a href="http://www.radartutorial.eu/08.transmitters/tx14.en.html">Solid State Amplifier</a></li>
+			<li>				<a href="http://www.radartutorial.eu/08.transmitters/tx15.en.html">Transmitter Modules of Active Antennas</a></li>
+		   </ul></li>
+	</ul></li>
+	<li>				<a href="http://www.radartutorial.eu/09.receivers/rx01.en.html" class="dir">Receiver</a>
+	    <ul><li class="first">		<span class="dir">Superheterodyne</span>
+		    <ul><li class="first">		<a href="http://www.radartutorial.eu/09.receivers/rx05.en.html">Functional Block Diagram</a></li>
+			<li>				<a href="http://www.radartutorial.eu/09.receivers/rx06.en.html">Image-Frequency Interferences</a></li>
+			<li>				<a href="http://www.radartutorial.eu/09.receivers/rx07.en.html">Double Heterodyning</a></li>
+		    </ul></li>
+		<li>				<a href="http://www.radartutorial.eu/09.receivers/rx08.en.html">Automatic Gain Control Methods</a></li>
+		<li>				<a href="http://www.radartutorial.eu/09.receivers/rx11.en.html">Automatic Frequency Control</a></li>
+		<li>				<a href="http://www.radartutorial.eu/09.receivers/rx12.en.html">Amplitude Detector</a></li>
+		<li>				<a href="http://www.radartutorial.eu/11.coherent/co01.en.html" class="dir">Coherent Radar Technology</a>
+		    <ul><li class="first">		<a href="http://www.radartutorial.eu/11.coherent/co04.en.html">Clutter</a></li>
+			<li>				<a href="http://www.radartutorial.eu/11.coherent/co06.en.html">Doppler Effect</a></li>
+			<li>				<a href="http://www.radartutorial.eu/11.coherent/co07.en.html">Pulse Pair Processing</a></li>
+			<li>				<a href="http://www.radartutorial.eu/11.coherent/co08.en.html">Doppler Filter</a></li>
+			<li>				<a href="http://www.radartutorial.eu/11.coherent/co13.en.html">Blind Speed</a></li>
+		    </ul></li>
+		   </ul>
+		</li>
+		<li>			<a href="http://www.radartutorial.eu/12.scopes/sc01.en.html" class="dir">Radar Scopes</a>
+		    <ul><li class="first">	<a href="http://www.radartutorial.eu/12.scopes/sc05.en.html">A-scope</a></li>
+			<li>			<a href="http://www.radartutorial.eu/12.scopes/sc06.en.html">B-scope</a></li>
+			<li>			<a href="http://www.radartutorial.eu/12.scopes/sc10.en.html">PPI-scope</a></li>
+		    </ul></li>
+			<li>		<a href="http://www.radartutorial.eu/10.processing/sp05.en.html" class="dir">Radar Signal Processing</a>
+		    <ul><li class="first">	<a href="http://www.radartutorial.eu/10.processing/sp06.en.html">&amp;Q Phase Detector</a></li>
+			<li>			<a href="http://www.radartutorial.eu/10.processing/sp08.en.html">Hit Processor</a></li>
+			<li>			<a href="http://www.radartutorial.eu/10.processing/sp11.en.html">Sliding Window</a></li>
+			<li>			<a href="http://www.radartutorial.eu/10.processing/sp13.en.html">Centre of Mass Correlation</a></li>
+			<li>			<a href="http://www.radartutorial.eu/10.processing/sp20.en.html">Local Tracking</a></li>
+		   </ul>
+		</li>
+	</ul>
+</li>
+
+
+<li id="n-service"><a href="http://www.radartutorial.eu/html/se02.en.html" class="dir" tabindex="6">Service</a>
+    <ul><li class="first">		<a href="http://www.radartutorial.eu/html/help.en.html">Help</a></li>
+	<li>				<a href="http://www.radartutorial.eu/html/author.en.html">About us</a></li>
+	<li>				<a href="http://www.radartutorial.eu/html/sm03.en.html" class="dir">Sitemap</a>
+	    <ul><li class="first">		<a href="http://www.radartutorial.eu/13.ssr/sr03.en.html">(in Sub Directory)</a></li>
+	    </ul></li>
+	<li>				<a href="http://www.radartutorial.eu/druck/index.html">Print Versions</a></li>
+	<li>				<a href="http://www.radartutorial.eu/html/html04.en.html">Suggested Literature</a></li>
+	<li>				<a href="http://www.radartutorial.eu/html/feed.en.html">Keyword Register</a></li>
+	<li>				<a href="http://www.radartutorial.eu/logos/hersteller.html">Radarmanufacturers Index</a></li>
+	<li>				<a href="http://www.radartutorial.eu/html/statistik.en.html">Daily Traffic</a></li>
+	<li>				<span class="dir">Appendices</span>
+	    <ul><li class="first">		<a href="http://www.radartutorial.eu/21.semiconductors/hl01.en.html">Semiconductors</a></li>
+		<li>				<a href="http://www.radartutorial.eu/07.waves/wa01.en.html">Propagation of Electromagnetic Waves</a></li>
+		<li>				<a href="http://www.radartutorial.eu/03.linetheory/tl01.en.html">Characteristics of Transmission Lines</a></li>
+		<li>				<a href="http://www.radartutorial.eu/19.kartei/ka03.en.html">Radar Sets</a></li>
+		<li>				<a href="http://www.radartutorial.eu/18.explanations/ex49.en.html">Metric Measurement Units</a></li>
+	    </ul></li>
+   </ul>
+</li>
+
+<li id="n-lingua"><span class="dir" id="navling">&nbsp;</span>
+    <ul>
+	<li class="first">		<a href="http://www.radartutorial.eu/13.ssr/sr82.de.html" id="de">Deutsch</a></li>
+	<li>				<span id="en">English</span></li>
+	<li>				<a href="http://www.radartutorial.eu/13.ssr/sr82.tr.html" id="tr">Türkçe</a></li>
+   </ul></li>
+
+
+<li class="vz">				<span id="vor1"></span></li>
+</ul>
+
+
+   <div class="expent">
+	<a href="http://www.gematronik.com/home/" id="selex2" target="_blank"></a><br>
+	<a href="http://www.sky-radar.com/" id="sky_en" target="_blank"></a><br>
+	<a href="http://www.cambridgepixel.com/" id="cpx_en" target="_blank"></a><br>
+	<!-- 3en -->
+	<!-- 4en -->
+	<a href="http://www.radartutorial.eu/html/werbung.en.html" id="self_en"></a>
+   </div>
+
+<!-- /Navigation -->
+
+
+<div class="content">
+
+<h4>Allocation of 24-Bit aircraft addresses to states</h4>
+
+<div class="pictable_l" style="width: 510px;">
+<table class="tabtable" style="width: 500px; padding: 3px; text-align: right;" border="1">
+<tbody><tr><th>State</th><th>Allocation of blocks of addresses</th></tr>
+<tr><td>Afghanistan</td><td>0111 00 000 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Albania</td><td>0101 00 000 001 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Algeria</td><td>0000 10 100 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Angola</td><td>0000 10 010 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Antigua and Barbuda</td><td>0000 11 001 010 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Argentina</td><td>1110 00 <span style="color:gray;">xxx xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Armenia</td><td>0110 00 000 000 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Australia</td><td>0111 11 <span style="color:gray;">xxx xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Austria</td><td>0100 01 000 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Azerbaijan</td><td>0110 00 000 000 10 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Bahamas</td><td>0000 10 101 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Bahrein</td><td>1000 10 010 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Bangladesh</td><td>0111 00 000 010 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Barbados</td><td>0000 10 101 010 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Belarus</td><td>0101 00 010 000 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Belgium</td><td>0100 01 001 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Belize</td><td>0000 10 101 011 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Benin</td><td>0000 10 010 100 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Bhutan</td><td>0110 10 000 000 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Bolivia</td><td>1110 10 010 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Bosnia and Herzegowina</td><td>0101 00 010 011 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Botswana</td><td>0000 00 110 000 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Brazil</td><td>1110 01 <span style="color:gray;">xxx xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Brunei Darussalam</td><td>1000 10 010 101 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Bulgaria</td><td>0100 01 010 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Burkina Faso</td><td>0000 10 011 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Burundi</td><td>0000 00 110 010 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Cambodia</td><td>0111 00 001 110 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Cameroon</td><td>0000 00 110 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Canada</td><td>1100 00 <span style="color:gray;">xxx xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Cap verde</td><td>0000 10 010 110 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Central African Republic</td><td>0000 01 101 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Chad</td><td>0000 10 000 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Chile</td><td>1110 10 000 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>China</td><td>0111 10 <span style="color:gray;">xxx xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Colombia</td><td>0000 10 101 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Comoros</td><td>0000 00 110 101 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Congo</td><td>0000 00 110 110 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Cook Islands</td><td>1001 00 000 001 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Costa Rica</td><td>0000 10 101 110 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Côte d'Ivoire</td><td>0000 00 111 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Croatia</td><td>0101 00 000 001 11 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Cuba</td><td>0000 10 110 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Cyprus</td><td>0100 11 001 000 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Czech Republic</td><td>0100 10 011 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Democratic People's Republic of Korea</td><td>0111 00 100 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Democratic Republic of the Congo</td><td>0000 10 001 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Denmark</td><td>0100 01 011 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Djibouti</td><td>0000 10 011 000 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Dominican Republic</td><td>0000 11 000 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Ecuador</td><td>1110 10 000 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Egypt</td><td>0000 00 010 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>El Salvador</td><td>0000 10 110 010 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Equatorial Guinea</td><td>0000 01 000 010 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Estland</td><td>0101 00 010 001 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Fidshi</td><td>1100 10 001 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Finnland</td><td>0100 01 100 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Frankreich</td><td>0011 10 <span style="color:gray;">xxx xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Gabun</td><td>0000 00 111 110 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Gambia</td><td>0000 10 011 010 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Georgien</td><td>0101 00 010 100 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Großbritannien</td><td>0100 00 <span style="color:gray;">xxx xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Ghana</td><td>0000 01 000 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Griechenland</td><td>0100 01 101 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Grenada</td><td>0000 11 001 100 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Guatemala</td><td>0000 10 110 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Guinea</td><td>0000 01 000 110 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Guinea-Bissau</td><td>0000 01 001 000 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Guyana</td><td>0000 10 110 110 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Haiti</td><td>0000 10 111 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Honduras</td><td>0000 10 111 010 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Hungary</td><td>0100 01 110 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Iceland</td><td>0100 11 001 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>India</td><td>1000 00 <span style="color:gray;">xxx xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Indonesia</td><td>1000 10 100 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Iran, Islamic Republic of</td><td>0111 00 110 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Iraq</td><td>0111 00 101 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Ireland</td><td>0100 11 001 010 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Israel</td><td>0111 00 111 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Italy</td><td>0011 00 <span style="color:gray;">xxx xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Jamaica</td><td>0000 10 111 110 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Japan</td><td>1000 01 <span style="color:gray;">xxx xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Jordan</td><td>0111 01 000 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Kazakhstan</td><td>0110 10 000 011 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Kenya</td><td>0000 01 001 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Kiribati</td><td>1100 10 001 110 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Kuwait</td><td>0111 00 000 110 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Kyrgyzstan</td><td>0110 00 000 001 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Lao People's Democratic Republic</td><td>0111 00 001 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Latvia</td><td>0101 00 000 010 11 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Lebanon</td><td>0111 01 001 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Lesotho</td><td>0000 01 001 010 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Liberia</td><td>0000 01 010 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Libyan Arab Jamahitiya</td><td>0000 00 011 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Lithuania</td><td>0101 00 000 011 11 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Luxembourg</td><td>0100 11 010 000 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Madagascar</td><td>0000 01 010 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Malawi</td><td>0000 01 011 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Malaysia</td><td>0111 01 010 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Maldives</td><td>0000 01 011 010 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Mali</td><td>0000 01 011 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Malta</td><td>0100 11 010 010 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Marshall Islands</td><td>1001 00 000 000 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Mauritania</td><td>0000 01 011 110 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Mauritius</td><td>0000 01 100 000 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Mexico</td><td>0000 11 010 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Micronesia, Federated States of</td><td>0110 10 000 001 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Monaco</td><td>0100 11 010 100 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Mongolia</td><td>0110 10 000 010 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Morocco</td><td>0000 00 100 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Mozambique</td><td>0000 00 000 110 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Myanmar</td><td>0111 00 000 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Namibia</td><td>0010 00 000 001 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Nauru</td><td>1100 10 001 010 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Nepal</td><td>0111 00 001 010 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Netherlands, Kingdom of the</td><td>0100 10 000 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>New Zealand</td><td>1100 10 000 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Nicaragua</td><td>0000 11 000 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Niger</td><td>0000 01 100 010 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Nigeria</td><td>0000 01 100 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Norway</td><td>0100 01 111 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Oman</td><td>0111 00 001 100 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Pakistan</td><td>0111 01 100 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Palau</td><td>0110 10 000 100 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Panama</td><td>0000 11 000 010 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Papua New Guinea</td><td>1000 10 011 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Paraguay</td><td>1110 10 011 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Peru</td><td>1110 10 001 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Philippines</td><td>0111 01 011 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Poland</td><td>0100 10 001 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Portugal</td><td>0100 10 010 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Qatar</td><td>0000 01 101 010 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Republic of Korea</td><td>0111 00 011 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Republic of Moldowa</td><td>0101 00 000 100 11 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Romania</td><td>0100 10 100 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Russian Federation</td><td>0001 <span style="color:gray;">xx xxx xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Rwanda</td><td>0000 01 101 110 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Saint Lucia</td><td>1100 10 001 100 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Saint Vincent and the Grenadines</td><td>0000 10 111 100 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Samoa</td><td>1001 00 000 010 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>San Marino</td><td>0101 00 000 000 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Sao Tome and Principe</td><td>0000 10 011 110 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Saudi Arabia</td><td>0111 00 010 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Senegal</td><td>0000 01 110 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Seychelles</td><td>0000 01 110 100 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Sierra Leone</td><td>0000 01 110 110 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Singapore</td><td>0111 01 101 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Slovakia</td><td>0101 00 000 101 11 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Slovenia</td><td>0101 00 000 110 11 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Solomon Islands</td><td>1000 10 010 111 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Somalia</td><td>0000 01 111 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>South Africa</td><td>0000 00 001 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Spain</td><td>0011 01 <span style="color:gray;">xxx xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Sri Lanka</td><td>0111 01 110 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Sudan</td><td>0000 01 111 100 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Suriname</td><td>0000 11 001 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Swaziland</td><td>0000 01 111 010 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Sweden</td><td>0100 10 101 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Switzerland</td><td>0100 10 110 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Syrian Arab Republic</td><td>0111 01 111 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Tadjikistan</td><td>0101 00 010 101 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Thailand</td><td>1000 10 000 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>The Former Yugoslav Republic of Macedonia</td><td>0101 00 010 010 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Togo</td><td>0000 10 001 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Tonga</td><td>1100 10 001 101 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Trinidad and Tobago</td><td>0000 11 000 110 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Tunisia</td><td>0000 00 101 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Turkey</td><td>0100 10 111 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Turkmenistan</td><td>0110 00 000 001 10 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Uganda</td><td>0000 01 101 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Ukraine</td><td>0101 00 001 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>United Arab Emirates</td><td>1000 10 010 110 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>United Kingdom</td><td>0100 00 <span style="color:gray;">xxx xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>United Republic of Tanzania</td><td>0000 10 000 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>United States</td><td>1010 <span style="color:gray;">xx xxx xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Uruguay</td><td>1110 10 010 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Uzbekistan</td><td>0101 00 000 111 11 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Vanatu</td><td>1100 10 010 000 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>Venezuela</td><td>0000 11 011 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Viet Nam</td><td>1000 10 001 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Yemen</td><td>1000 10 011 000 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Yugoslavia</td><td>0100 11 000 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>Zambia</td><td>0000 10 001 010 <span style="color:gray;">xx xxxxxxxxxx</span></td></tr>
+<tr><td>Zimbabwe</td><td>0000 00 000 100 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>ICAO</td><td>1111 00 000 <span style="color:gray;">xxx xx xxxxxxxxxx</span></td></tr>
+<tr><td>ICAO</td><td>1000 10 011 001 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+<tr><td>ICAO</td><td>1111 00 001 001 00 <span style="color:gray;">xxxxxxxxxx</span></td></tr>
+</tbody></table>
+</div>
+
+
+
+     <div class="footer1">
+	<a href="#this" class="screenform" style="float: right; margin: 5px;" id="up" title="top of the page"></a>
+	<p>Publisher: <a href="http://www.radartutorial.eu/html/author.en.html">Christian Wolff</a><br>Text is available under the
+	   <a href="http://www.radartutorial.eu/html/gnu.en.html" target="_blank">GNU Free Documentation License</a>, and the<br>
+	   <a href="http://www.radartutorial.eu/html/license.en.html" target="_blank">Creative Commons Attribution-Share Alike 3.0 Unported</a> license,
+	   additional terms may apply.</p>
+     </div>
+
+	<script async="" src="ICAO_address_allocation_by_country_files/cbgapi.js"></script><script type="text/javascript" async="" src="ICAO_address_allocation_by_country_files/quant.js"></script><script src="ICAO_address_allocation_by_country_files/ga.js" async="" type="text/javascript"></script><script type="text/javascript" src="ICAO_address_allocation_by_country_files/socialnetworks.js"></script><div id="enjoy"><div id="facebook"> <a rel="nofollow" href="http://www.facebook.com/pages/Radartutorial/273319309364957?sk=wall" target="_blank" title="The Radartutorial also has its own Facebook entry displaying the main changes in this website."><img src="ICAO_address_allocation_by_country_files/facebook.png" alt="Facebook-account Radartutorial"></a><iframe src="ICAO_address_allocation_by_country_files/like.html" style="border: medium none; overflow: hidden; width: 450px; height: 21px;" allowtransparency="true" frameborder="0" scrolling="no"></iframe></div><div id="social"><div style="height: 15px; width: 70px; display: inline-block; text-indent: 0pt; margin: 0pt; padding: 0pt; background: none repeat scroll 0% 0% transparent; border-style: none; float: none; line-height: normal; font-size: 1px; vertical-align: baseline;" id="___plusone_0"><iframe title="+1" allowtransparency="true" hspace="0" marginheight="0" marginwidth="0" style="position: static; top: 0pt; width: 70px; margin: 0px; border-style: none; height: 15px; left: 0pt; visibility: visible;" tabindex="0" vspace="0" id="I1_1336873434176" name="I1_1336873434176" src="ICAO_address_allocation_by_country_files/fastbutton.html" frameborder="0" scrolling="no" width="100%"></iframe></div><a rel="nofollow" style="text-decoration: none;" href="http://www.webnews.com/" onclick="window.open('http://www.webnews.com/einstellen?url='+encodeURIComponent(document.location)+'&amp;title='+encodeURIComponent(document.title));return false;" title="bookmark at Webnews">  <img style="padding-bottom: 1px;" src="ICAO_address_allocation_by_country_files/Webnews.png" alt="bookmark at Webnews" name="Webnews" id="Webnews" border="0"></a><a rel="nofollow" style="text-decoration: none;" href="http://yigg.com/" onclick="window.open('http://yigg.com/neu?exturl='+encodeURIComponent(location.href));return false" title=" bookmark at Yigg"> <img style="padding-bottom: 1px;" src="ICAO_address_allocation_by_country_files/Yigg.png" alt=" bookmark at Yigg" name="Yigg" id="Yigg" border="0"></a><a rel="nofollow" style="text-decoration: none;" href="http://digg.com/" onclick="window.open('http://digg.com/submit?phase=2&amp;url='+encodeURIComponent(location.href)+'&amp;bodytext=&amp;tags=&amp;title='+encodeURIComponent(document.title));return false;" title="bookmark at Digg"> <img style="padding-bottom: 1px;" src="ICAO_address_allocation_by_country_files/Digg.png" alt="bookmark at Digg" name="Digg" id="Digg" border="0"></a><a rel="nofollow" style="text-decoration: none;" href="http://www.mister-wong.com/" onclick="window.open('http://www.mister-wong.com/index.php?action=addurl&amp;bm_url='+encodeURIComponent(location.href)+'&amp;bm_notice=&amp;bm_description='+encodeURIComponent(document.title)+'&amp;bm_tags=');return false;" title="bookmark at Mr. Wong"> <img style="padding-bottom: 1px;" src="ICAO_address_allocation_by_country_files/Wong.png" alt="bookmark at Mr. Wong" name="wong" id="wong" border="0"></a><a rel="nofollow" style="text-decoration: none;" href="http://www.scoop.com/" onclick="window.open('http://www.scoop.com/submit?url='+encodeURIComponent(document.location)+'&amp;title='+encodeURIComponent(document.title));return false;" title="bookmark at Scoop"> <img style="padding-bottom: 1px;" src="ICAO_address_allocation_by_country_files/Scoop.png" alt="bookmark at Scoop" name="Scoop" id="Scoop" border="0"></a><a rel="nofollow" style="text-decoration: none;" href="http://www.oneview.com/" onclick="window.open('http://www.oneview.com/quickadd/neu/addBookmark.jsf?URL='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title));return false;" title="bookmark at Oneview"> <img style="padding-bottom: 1px;" src="ICAO_address_allocation_by_country_files/Oneview.png" alt="bookmark at Oneview" name="Oneview" id="Oneview" border="0"></a><a rel="nofollow" style="text-decoration: none;" href="http://www.linkarena.com/" onclick="window.open('http://linkarena.com/bookmarks/addlink/?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title)+'&amp;desc=&amp;tags=');return false;" title=" bookmark at Linkarena"> <img style="padding-bottom: 1px;" src="ICAO_address_allocation_by_country_files/Linkarena.png" alt=" bookmark at Linkarena" name="Linkarena" id="Linkarena" border="0"></a><a rel="nofollow" style="text-decoration: none;" href="http://del.icio.us/" onclick="window.open('http://del.icio.us/post?v=2&amp;url='+encodeURIComponent(location.href)+'&amp;notes=&amp;tags=&amp;title='+encodeURIComponent(document.title));return false;" title="bookmark at Del.icio.us"> <img style="padding-bottom: 1px;" src="ICAO_address_allocation_by_country_files/Del.png" alt="bookmark at Del.icio.us" name="Delicious" id="Delicious" border="0"></a><a rel="nofollow" style="text-decoration: none;" href="http://www.stumbleupon.com/" onclick="window.open('http://www.stumbleupon.com/submit?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title));return false;" title="bookmark at StumbleUpon"> <img style="padding-bottom: 1px;" src="ICAO_address_allocation_by_country_files/Stumbleupon.png" alt="bookmark at StumbleUpon" name="StumbleUpon" id="StumbleUpon" border="0"></a><a rel="nofollow" href="http://www.twitter.com/Radartutorial" title="Tweet"><img src="ICAO_address_allocation_by_country_files/t_mini-c.png" alt="Follow @Radartutorial"></a></div></div>
+	<script gapi_processed="true" type="text/javascript" src="ICAO_address_allocation_by_country_files/plusone.js">{lang: 'en'}</script>
+	<script type="text/javascript" src="ICAO_address_allocation_by_country_files/widgets.js"></script>
+
+   </div>
+  
+</body></html>

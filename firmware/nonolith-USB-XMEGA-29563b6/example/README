@@ -1,0 +1,141 @@
+- switched to 8 mhz xtal - done
+- validate manchest for long packet - done
+- need to change to USB Virtual serial port
+- get 112bit squitters working - done
+
+- need to periodically service USB CTRL requests in loop (break out of edge detect loop periodically) - done
+	- see USB_Task() for EP0 checking 
+		- endpoints = 0xb02 to 0xb32
+	- see USB_ep_in_start
+- can queue and start IN pkts from ASM code quickly
+
+- fix DAC offset to adjust automatically to adc reading.
+- fix makefile to build both CDC and custom-protocol firmware images
+- queue multiple packets - implement fifo
+- implement mode a/c and TACAN decoding in avr
+
+- if using CDC class, OS drivers take over and prevent direct access
+
+- Set MAXEP to 2 (one IN one OUT)
+- Enable USB transaction complete fifo?
+- write USB calibration HI/LO values into register. Remove the inline resistors from next rev.
+- check TRNCOMPL0 to see if packet was sent. - done
+- use 8 or 16 byte max max size for BUFSIZE
+- enable auto multipacket transfers
+
+- set up fifo queue for adsb_buf.  read and write ptr.  to send pkt, write starting addr and CNTL
+- after writing a new packet and triggering transfer, advance ptr or mark buf as free
+- if <14 bytes left before end of fifo, advance to front of buffer
+
+- get libhomeradar working
+
+--------
+- other ideas: 
+	- announce when new aircraft spotted
+	- announce when an aircraft lands, or takes off
+	- announce last time this ac was seen
+	- downlink request bit set by an A/C should be indicated on screen
+	- add packet type which is the count of short and long packets dropped (<7 and <14 bytes rx) - almost done
+---
+- listen for DF11 all call reply and validate (CRC ^ calc_crc == 0).  This validates the packet and gives us a known
+  aircraft ID.  Place that ID in the rollcall table.  - done
+	- if not zero, and if all bits are zero except for lowest 4 bits, then those 4 bits are known to be the 
+	  interrogator ID.
+- Subsequent DF0, DF4, DF5, DF20, DF21 packets can calculate the (ACID = crc ^ calc_crc).  If this ACID is found in 
+  table, then this is a good packet from that known A/C.  If not, then either we haven't see a DF11 from the a/c yet
+  or the crc failed due to packet corruption. - done
+	- in real operation, the interrogator is selectively interrogating one A/C, and so it knows what ACID is
+	  expected, and therefore the CRC to expect.
+	- errors which span less than 24 bits can be corrected supposedly Ref 16
+	- once acquired, the a/c is locked from future all-call interrogations
+- DF17, DF18, DF19 can do normal CRC check, since CRC is not XORed with AA - done
+- normally, the interrogators only requests Comm-A (altitude only).  Comm-B (altitude/identity) only on first
+  scan of a roll-call interrogation
+
+- msg formats:
+	- 48 bit timestamp (12 or 20 mhz)
+	- rx signal level (avg? noise floor? data peaks?)
+	- read/write ptrs
+
+AVR Raw format:
+Basic message, no CRC (planeplotter mode), adsbstick,Bluebox,Blackbox, Beast, microadsb, Sprut:	
+	* (14 or 28 hex chars) ; CR LF
+Raw data message, CRC xor executed/validated, adsbstick,bluebox,blackbox:	
+	: (14 or 28 hex chars) ; CR LF
+
+Embedded AVR raw data formats
+	(# or @) (6 bytes timestamp) followed by AVR raw format message above
+		# : means low rx signal
+		@ or $: means high rx signal
+		timestamp has 1 sec resolution (hr, min, sec)
+		bluebox, blackbox
+
+	(@ or %) (12 byte timestamp) followed by AVR raw format without '*' or ':'
+		48bit timestamp has 50ns resolution (20 mhz)
+		@ means CRC off
+		% means CRC on
+
+Debug messages from mA200 AVR chip (Blackbox)
+	~ (4 byte RD ptr) (4 byte WR ptr) followed by AVR raw format
+
+Beast/microadsb/Sprut raw data format, no CRC, no timestamp
+	Just like AVR raw format, but starting with '*' only
+
+Beast/microadsb/Sprut raw data format, no CRC, with timestamp
+	@ (12 byte timestamp) followed by AVR raw data format without '*' or ':'
+		timestamp is 48 bits, wiith 83.333ns resolution (12MHz)
+
+Beast/microadsb/Sprut raw data format, no CRC, with timestamp and RX level
+	< (12 byte timestamp) (2 byte RX level) followed by AVR raw data format without '*' or ':'
+
+Beast raw BINARY format with timestamp and rx level, no CRC
+	ESC (1 byte ID val) (6 byte timestamp) (1 byte rx level) (2 or 7 or 14 byte message)
+		ID value is: 1: 2 byte SSR message, 2: 7 byte mode-S, 3: 14 byte mode-S
+		timestamp if 48 bit with 83.33 ns (12mhz) resolution
+
+----- 
+KML file:
+placemarks, lots of points,
+	<Placemark>
+	<name>19:05:56 (UTC), 278.7 km/h</name>
+	<description>Total distance traveled: 503 m
+	Current altitude: 610166 m
+	Number of Satellites: 8</description>
+
+------
+
+- capture timestamp of Mode-S all-call replies.  use this to establish the period of the interrogator antenna beam
+- use the known position of a mode-s ext squitter (and the location of the interrogator?) to determine the phase angle offset
+- use the phase angle offset to compute the azmiuth to the mode s short acas only packets from other aircraft.  
+
+- use Azimuth/Distance calculator - by Don Cross to compute el/az, range to a/c
+
+-----
+- test6.py implements a tcp server for planeplotter which works by playing back a packet log file.
+	- need way to handle multiple clients
+	- need separate server thread(s) to avoid slowing down packet reception.
+	- need some kind of fifo between data src and server threads
+	- use python threadsafe Queue.  writer should do non-blocking write to all clients, and clients should do blocking read on queue
+	- one server thread - SocketServer serve_forever()
+	- one thread per client - pulls from its own Queue and writes to client.  need threadsafe list add/remove.  list.add, remove are threadsafe
+	- one serial processing thread writes data to multiple Queues and to log file
+
+---------
+- for Virtual serial port mode firmware, use AVR raw data format (*, 14-28hex, ; CR LF) (planeplotter mode)
+- alternate format should be beast/microadsb/sprut raw format (@, 48bit, 4,14,28hex, ; CR LF) 12 MHz timestamp
+- use LUFA lowlevel virtual serial port as a starting point
+
+
+-----------
+Python app
+
+- Aircraft / AdsbDecoder / AdsbThread
+- QtAircraft / QtAdsbDecoder - inherit from above, create QtAircraft rather than Aircraft
+
+- in Qt version, QtApp runs in main thread, decoder runs in child thread.  decoder must send signals to main thread.  Cannot do GUI stuff in child thread.
+
+-----------
+For AGC:
+	- Disable DACB for 4 time-constants (414 msec)
+	- Read ADC value on PA0 (maybe average several readings)
+	- 

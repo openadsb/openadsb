@@ -1,0 +1,837 @@
+/* ------------- Page-outfit on screen--------- */
+
+* {	margin: 0px; padding:0px;}
+
+
+body	{
+	padding: 10px 20px 10px 50px;
+	background: #4c4c4c url(images/grad1.png) 0 0 repeat-x;
+	background-attachment: fixed;
+	color: #d9d9d9;
+	font-family: Arial, Helvetica, sans-serif;
+	font-weight: normal;
+	font-size: 100%;
+	min-width: 1024px;
+	}
+
+h1	{
+	z-index: 5;
+	margin-bottom: .5em;
+	border-bottom: solid 1px #d9d9d9;
+	font-family: Arial, Helvetica, sans-serif;
+	font-weight: normal;
+	font-size: 180%;
+	text-indent: 1em; letter-spacing: -1px;
+	}
+
+h2	{
+	z-index: 5;
+	margin-bottom: .5em;
+	font-family: Arial, Helvetica, sans-serif;
+	font-weight: normal;
+	font-size: 150%;
+	text-indent: 1em; letter-spacing: -1px;
+	}
+
+
+h3 {	font-family: italic, georgia, arial, verdana, tahoma, sans-serif;
+	font-size: 16px;
+	font-style:italic;
+	font-weight: bold;
+	text-align: right;
+	color: #ef0800; }   /* Bordeaurot */
+
+h4 {	font-size: 20px;
+	font-style: italic;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-weight: bold;
+	text-align: left;
+	color: #ef0800;   /* Bordeaurot */
+	margin: 1em; }
+
+h5 {	font-size: 16px;
+	font-style: italic;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-weight: bold;
+	text-align: left;
+	color: #eacab4;   /* Elfenbein */
+	margin: 1em; }
+
+h6 {	font-size: 11px;
+	font-style: italic;
+	font-family: verdana, tahoma, arial, sans-serif;
+	text-align: right;
+	margin-top: 2em;
+	margin-left: 20px;
+	margin-right: 20px;
+	margin-bottom: 10px;
+	white-space: nowrap;
+ }
+
+p,li,td {
+	margin: .3em;
+	font-family: arial, verdana, tahoma, sans-serif; }
+
+cite	{
+	float: right;
+	}
+
+ul	{
+	list-style: disc;
+	margin-bottom: 1em;
+	padding-left: 2em;
+	}
+
+ol	{
+	margin-bottom: 1em;
+	padding-left: 2em;
+	}
+
+div.section	{
+	clear: both;
+	padding-top: 50px;
+	}
+
+.copyright	{
+	padding-left:100px;
+	font-family: Arial, Helvetica, sans-serif;
+	font-weight: normal;
+	font-style: italic;
+	font-size: 60%;
+		}
+.navlist {					/* "Sie sind hier..."  */
+	z-index: 20;
+	text-align: right;	
+	margin: 15px 12px 5px 5px;
+	font-size: 12px;
+	float:right;
+	}
+
+
+
+table {
+	padding: 0px;
+	margin:0px;
+	border-collapse:collapse;
+	border-spacing:1px;
+}
+
+hr {	color: #D9D9D9;
+	background: transparent none repeat scroll 0%;
+	border: solid #D9D9D9 1px;
+	height: 1px;
+}
+
+form	{
+	background-color:transparent;
+	color: #eacab4;
+	padding: 20px;
+	border: 0; }
+
+input,textarea	{
+	font-size: 13px;
+	font-family: verdana, sans-serif;
+	font-weight: bold;
+	color: #eacab4;
+	background-color: #404040;
+	border-color: #543D32; }
+
+
+div.content {
+	clear:left;				/* IE 7 bugfix  */
+	margin-right: 140px;			/* Platz lassen für Werbung */
+	padding-top: 2px;
+	min-height: 20em;
+	height: 1%;				/* Bugfix für IE6 */
+}
+
+
+/* ________________    Texteigenschaften    ________________ */
+
+
+img	{border: none;}
+
+.explan {
+	font-family: arial, verdana, tahoma, sans-serif;
+	border-bottom: 1px dotted #5f5f5f;
+	color: #E7F0B6;
+	cursor:help;}
+
+.spacing {
+	margin-left: 40px;
+}
+
+a:link {color: #b0b0de; text-decoration: none; }
+a:active {color: #C9494C; text-decoration: underline; }
+a:visited {color: #ed83f7; text-decoration: none; }
+a:hover {color: #6B6DC9; text-decoration: underline; }
+
+
+.footer1 {
+	border-top: solid 1px #d9d9d9;
+	border-bottom: solid 1px #d9d9d9;
+	font-family: Arial, Helvetica, sans-serif;
+	font-weight: normal;
+	text-align: right;
+	font-size: 75%;
+	clear:both;
+}
+
+.highlight {
+	text-align: center;
+	background-color: #383838;
+	font-size: 110%;
+	border-style: solid;
+	border-width: thin;
+	border-top-color: #404040;
+	border-left-color: #505050;
+	border-right-color: #202020;
+	border-bottom-color: #202020;
+	padding: 5px;
+}
+
+.highlights {
+	text-align: left;
+	background-color: #383838;
+	font-size: 100%;
+	border-style: solid;
+	border-width: thin;
+	border-top-color: #404040;
+	border-left-color: #505050;
+	border-right-color: #202020;
+	border-bottom-color: #202020;
+	padding: 5px;
+}
+
+.note {
+	font-family: verdana, tahoma, arial, sans-serif;
+	font-size: 80%;
+	font-style: italic;
+	text-align: left;	
+	padding-left: 3em;
+	z-index:2;
+}
+
+.fussnote {
+	border-top: solid 1px gray;
+	margin-top: 1em;
+	clear: both;
+}
+
+.linke_spalte {
+	width:48%;
+	float:left;
+	clear:left;
+	margin-bottom:1em;
+}
+.rechte_spalte {
+	width:48%;
+	float:right;
+	clear:right;
+	margin-bottom:1em;
+}
+
+.ulpic { /* Browserbug */
+	margin-left:320px;
+}
+
+/* _____________    Navigation    _____________ */
+
+
+.nav_rp {			/* Nav Radargeräte */
+	margin-left:130px;
+	}
+
+.nav_bs {			/* Nav Radarverfahren */
+	margin-left:340px;
+	}
+
+.nav_an {			/* Nav Radarbaugruppen */
+	margin-left:500px;
+	}
+
+.nav_se {			/* Nav Service */
+	margin-left:620px;
+	}
+
+
+/* _____________  Formeltabellen  ___________*/
+
+.formel {
+	margin-left: 40px;
+	padding-left: 5px;
+	padding-right: 5px;
+	font-style: italic;
+	text-align: center;
+	vertical-align:middle;
+	white-space: nowrap;
+}
+.fnenner {
+	font-family: 'Times New Roman',Georgia,serif;
+	font-size: 130%;
+	vertical-align: text-top;
+	font-weight: bold;
+	font-style: italic;
+}
+.fzaehler {
+	font-family: 'Times New Roman',Georgia,serif;
+	font-size: 130%;
+	vertical-align: text-bottom;
+	font-weight: bold;
+	font-style: italic;
+	margin: 0px;
+}
+.fgleich {
+	font-family: 'Times New Roman',Georgia,serif;
+	font-size: 130%;
+ 	padding-left: 5px;
+	padding-right: 5px;
+	font-weight: bold;
+	font-style: italic;
+	margin: 0px;
+}
+.fwhere {
+ 	padding-left: 40px;
+	padding-right: 5px;
+	font-style: normal;
+	font-size:80%;
+	white-space: nowrap;
+	vertical-align:top;
+	margin: 1em;
+}
+.flegende {
+ 	padding-left: 20px;
+	min-width:100px;
+	text-align: left;
+	font-style: normal;
+	font-size:80%;
+	vertical-align: bottom;
+	white-space: nowrap;
+	margin: 0px;
+}
+.fsymbol {
+	font-family: 'Times New Roman',Georgia,serif;
+	font-style: italic;
+	font-size:110%;
+	vertical-align: bottom;
+	white-space: nowrap;
+	margin: 0px;
+}
+.ftext {
+	font-family: 'Times New Roman',Georgia,serif;
+	font-style: italic;
+	font-size:110%;
+	white-space: nowrap;
+}
+.fnummer {
+	min-width:100px;
+	text-align: right;
+	font-style: italic;
+	font-size:80%;
+	vertical-align: bottom;
+}
+.fut {  color: #876E5B; }
+
+
+.screenform {
+	text-align: right;	
+	padding: 0px;
+	z-index:2;
+}
+.nobreak {
+	white-space: nowrap;
+}
+
+.tx90 {	text-align: right;
+	-o-transform: rotate(-90deg);
+	-moz-transform: rotate(-90deg);
+	-webkit-transform: rotate(-90deg);
+	-ms-transform: rotate(-90deg);
+	transform: rotate(-90deg); 
+}
+
+
+
+
+
+/* ________________    Bildelemente    ________________ */
+
+
+
+.pictable_r {
+	float: right;
+	clear: right;
+	border-style: solid;
+	border-width: thin;
+	border-top-color: #505050;
+	border-left-color: #404040;
+	border-right-color: #202020;
+	border-bottom-color: #202020;
+	margin-left: 20px;
+	margin-bottom: 20px;
+	padding: 4px;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-size: 14px;
+	font-style: italic;
+	text-align: center;
+	background-color: transparent;
+}
+
+.pictable_rn {
+	float: right;
+	border-style: solid;
+	border-width: thin;
+	border-top-color: #505050;
+	border-left-color: #404040;
+	border-right-color: #202020;
+	border-bottom-color: #202020;
+	margin-left: 20px;
+	margin-bottom: 20px;
+	padding : 4px;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-size: 14px;
+	font-style: italic;
+	text-align: center;
+	background-color: transparent;
+}
+.pictable_l {
+	float: left;
+	clear: left;
+	border-style: solid;
+	border-width: thin;
+	border-top-color: #505050;
+	border-right-color: #202020;
+	border-left-color: #404040;
+	border-bottom-color: #202020;
+	margin-right: 20px;
+	margin-bottom: 20px;
+	padding : 4px;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-size: 14px;
+	font-style: italic;
+	text-align: center;
+	background-color: transparent;
+}
+.pictable_c {
+	float: none;
+	border-style: solid;
+	border-width: thin;
+	border-top-color: #505050;
+	border-left-color: #404040;
+	border-right-color: #202020;
+	border-bottom-color: #202020;
+	margin: 0 auto;
+	padding : 4px;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-size: 14px;
+	font-style: italic;
+	text-align: left;
+	background-color: transparent;
+}
+.inlinepic {
+	padding : 4px;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-size: 14px;
+	font-style: italic;
+	text-align: center;
+	margin-left: 20px;
+	margin-right: 20px;
+	background-color: transparent;
+}
+.leftext {
+	float:right;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-size: 14px;
+	font-style: italic;
+	text-align: left;
+	margin-left: 20px;
+	margin-bottom: 10px;
+	background-color: transparent;
+}
+
+.tabtable {
+	border-style: solid;
+	border-width: thin;
+	border-top-color: #A88574;
+	border-left-color: #5D483D;
+	border-right-color: #5D483D;
+	border-bottom-color: #5D483D;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-size: 90%;
+	background-color:#404040;
+}
+
+.tabtable th {
+	font-size: 120%;
+}
+
+.tabtable td {
+	padding: 5px;
+}
+
+.list td {
+	border-bottom: 1px dotted gray;
+	vertical-align:bottom;
+	padding-right:2em;
+}
+.iedoc {
+	padding-left: 20px;
+	background-image: url(images/document.png);
+	background-repeat: no-repeat;
+
+}
+.see {
+	margin-left: 20px;
+	padding-left: 20px;
+	background-image: url(images/vorsmall.png);
+	background-position: 0px 3px;
+	background-repeat: no-repeat;
+	font-size:80%;
+	font-style:italic;
+}
+
+#sol {
+	position:relative;    /*  margin des body ausgleichen  */
+	top:-10px;
+	left:-50px;
+	width:40px;
+	height:100%;
+	padding: 0px 80px 80px 0px;
+	background-image: url(images/solarisation.png);
+	background-position: 1px 1px;
+	background-repeat: no-repeat;
+	margin-bottom:-80px;
+	z-index:1;
+	display: block;
+}
+
+
+
+/* _____  Tabelle taktisch- technische Daten  ________ */
+
+.ttd-rahmen {
+	float: left;
+	clear: left;
+	border-style: solid;
+	border-width: thin;
+	border-top-color: #505050;
+	border-left-color: #404040;
+	border-right-color: #202020;
+	border-bottom-color: #202020;
+	padding : 4px;
+	margin-right: 20px;
+	background-color:#353535;
+}
+
+.ttd {
+	border-style: none;
+	margin : 4px;
+	padding : 4px;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-size: 90%;
+	background-color:#353535;
+	white-space: nowrap;
+}
+.statistik {
+	border-style: none;
+	margin : 4px;
+	padding : 4px;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-size: 80%;
+	background-color:#353535;
+}
+.statistik th {
+	text-align: center;
+	font-weight: bold;
+	white-space: nowrap;
+}
+.statistik td {
+	text-align: right;
+	white-space: nowrap;
+}
+
+
+/* ________________     Soziale Netzwerke    ________________ */
+
+
+#enjoy {
+	font-family: Arial, Helvetica, sans-serif;
+	width: 90%;
+	font-size: 60%;
+	clear:both;
+	padding-top:1em;
+	margin-bottom:2em;
+	display:block;
+}
+
+#social {
+	white-space: nowrap;
+	display:block;
+
+}
+
+#facebook {
+	float:left;
+	width:160px;
+	margin-top: -2px;
+	white-space: nowrap;
+}
+
+
+/* ________________    Firmenlogos    ________________ */
+
+.alenia {
+	float:left;
+	width: 30px;
+	height: 27px;
+	margin: 4px;
+	background-image : url(../../logos/alenialogo.gif);
+	background-repeat: no-repeat;
+}
+.ams {
+	float:left;
+	width: 250px;
+	height: 40px;
+	margin: 4px;
+	margin-right:2em;
+	background-image : url(../../logos/ams_pos.gif);
+	background-repeat: no-repeat;
+}
+.eads {
+	float:left;
+	width: 80px;
+	height: 58px;
+	margin: 4px;
+	background-image : url(../../logos/eads.gif);
+	background-repeat: no-repeat;
+}
+
+.eldis {
+	float:left;
+	width: 150px;
+	height: 40px;
+	margin: 4px;
+	background-image : url(../../logos/eldislogo.png);
+	background-repeat: no-repeat;
+}
+
+.ericson {
+	float:left;
+	width: 100px;
+	height: 20px;
+	margin: 4px;
+	background-image : url(../../logos/ericsson.gif);
+	background-repeat: no-repeat;
+}
+.itt {
+	float:left;
+	width: 25px;
+	height: 27px;
+	margin: 4px;
+	background-image : url(../../logos/ittgil.gif);
+	background-repeat: no-repeat;
+}
+.kongsberg {
+	float:left;
+	width: 52px;
+	height: 20px;
+	margin: 4px;
+	background-image : url(../../logos/norcontrolit.jpg);
+	background-repeat: no-repeat;
+}
+.LMC {
+	float:right;
+	width: 237px;
+	height: 37px;
+	margin: 4px;
+	background-image : url(../../logos/lmclogo.gif);
+	background-repeat: no-repeat;
+}
+.PVO {
+	float:right;
+	width: 150px;
+	height: 72px;
+	margin: 4px;
+	padding-left:80px;
+	background-image : url(../../logos/almaz.png);
+	background-repeat: no-repeat;
+}
+.thalesatm {
+	float:left;
+	width: 160px;
+	height: 27px;
+	margin: 4px;
+	background-image : url(../../logos/thaleslogo.gif);
+	background-repeat: no-repeat;
+}
+.thomson {
+	float:left;
+	width: 150px;
+	height: 35px;
+	margin: 4px;
+	background-image : url(../../logos/thomson-csf.gif);
+	background-repeat: no-repeat;
+}
+.raytheon {
+	float:left;
+	width: 75px;
+	height: 15px;
+	margin: 4px;
+	background-image : url(../../logos/raytheon_logo.gif);
+	background-repeat: no-repeat;
+}
+.selex-si {
+	float:left;
+	width: 131px;
+	height: 50px;
+	margin: 4px;
+	background-image : url(../../logos/selex.gif);
+	background-repeat: no-repeat;
+}
+.nrplgroup {
+	float:left;
+	width: 130px;
+	height: 40px;
+	margin: 4px 0px;
+	padding-left:50px;
+	background-image : url(../../logos/nrpl.png);
+	background-repeat: no-repeat;
+	font-size: 120%;
+}
+.wera {
+	float:left;
+	width: 100px;
+	height: 47px;
+	margin: 4px;
+	background-image : url(../../logos/wera.png);
+	background-repeat: no-repeat;
+}
+
+/* ____ Auf dem Bildschirm nichtangezeigte Objekte ____ */
+
+.druckform {
+	display:none;
+}
+
+.hh_yes {		/* Handheld */
+	display:none;
+}
+
+#copyright {
+	display:none;
+}
+
+
+
+/* ________________    Werbeblock    ________________ */
+
+
+.expent {
+
+	margin-top: 40px;
+	width: 120px;
+	height:700px;
+	margin-bottom: -700px;
+	float:right;
+	padding: 0px;
+	display: block;
+}
+
+#selex2 {
+	position:relative;
+	top:10px;
+	padding: 0px 120px 40px 0px;
+	height:60px;
+	background-image: url(../expent/adselex2.png);
+	background-repeat: no-repeat;
+	display: block;
+	z-index:12;
+}
+
+#sky_de {
+	position:relative;
+	top:10px;
+	padding: 0px 120px 60px 0px;
+	height:60px;
+	background-image: url(../expent/skyradar.de.png);
+	background-repeat: no-repeat;
+	display: block;
+	z-index:13;
+}
+#sky_en, #sky_ro, #sky_es {
+	position:relative;
+	top:10px;
+	padding: 0px 120px 60px 0px;
+	height:60px;
+	background-image: url(../expent/skyradar.en.png);
+	background-repeat: no-repeat;
+	display: block;
+	z-index:13;
+}
+#sky_fr {
+	position:relative;
+	top:10px;
+	padding: 0px 120px 60px 0px;
+	height:60px;
+	background-image: url(../expent/skyradar.fr.png);
+	background-repeat: no-repeat;
+	display: block;
+	z-index:13;
+}
+#sky_tr {
+	position:relative;
+	top:10px;
+	padding: 0px 120px 60px 0px;
+	height:60px;
+	background-image: url(../expent/skyradar.tr.png);
+	background-repeat: no-repeat;
+	display: block;
+	z-index:13;
+}
+
+#cpx_de, #cpx_en, #cpx_es, #cpx_fr, #cpx_ro, #cpx_tr  {
+	position:relative;
+	top:10px;
+	padding: 0px 120px 80px 0px;
+	height:80px;
+	background-image: url(../expent/spx.png);
+	background-repeat: no-repeat;
+	display: block;
+	z-index:14;
+}
+
+
+
+#self_de {
+	position:relative;
+	top:10px;
+	padding: 0px 120px 60px 0px;
+	height:60px;
+	background-image: url(../expent/ad1.gif);
+	background-repeat: no-repeat;
+	z-index:99;
+	display: block;
+}
+#self_en {
+	position:relative;
+	top:10px;
+	padding: 0px 120px 60px 0px;
+	height:60px;
+	background-image: url(../expent/ad1.en.gif);
+	background-repeat: no-repeat;
+	z-index:99;
+	display: block;
+}
+#self_tr {
+	position:relative;
+	top:10px;
+	padding: 0px 120px 60px 0px;
+	height:60px;
+	background-image: url(../expent/ad1.tr.gif);
+	background-repeat: no-repeat;
+	z-index:99;
+	display: block;
+}
+
+
+

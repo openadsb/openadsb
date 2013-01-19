@@ -1,0 +1,565 @@
+/* ------------- Page-outfit on screen--------- */
+
+* {	margin: 0px; padding:0px;}
+
+
+body	{
+	padding: 0px;
+	background: #4c4c4c url(images/grad1.png) 0 0 repeat-x;
+//	background: #4c4c4c url(images/screens.png) 0 0 no-repeat;
+	background-attachment:fixed;
+	color: #d9d9d9;
+	font: 100%/normal Tahoma, Arial, Helvetica, sans-serif;
+	text-align: center;
+	min-width: 250px;
+	}
+
+div.content {
+	margin: 33px 1px;
+	padding:0px;
+	}
+
+ul, ol	{
+	text-align: left;
+	}
+
+div.pictable_r p, div.pictable_rn p {
+	font-size: 70%;
+	}
+
+
+h1	{
+	font-family: Arial, Helvetica, sans-serif;
+	font-weight: normal;
+	}
+
+h2	{
+	font-family: Arial, Helvetica, sans-serif;
+	font-weight: normal;
+	font-size: 110%;
+	}
+
+
+h3 {	font-family: italic, georgia, arial, verdana, tahoma, sans-serif;
+	font-size: 110%;
+	color: #ef0800; }   /* Bordeaurot */
+
+h4 {	font-family: arial, verdana, tahoma, sans-serif;
+	text-align: left;
+	color: #ef0800;   /* Bordeaurot */
+	}
+
+h5 {	font-family: arial, verdana, tahoma, sans-serif;
+	color: #eacab4;   /* Elfenbein */
+	}
+
+h6 {	font-family: verdana, tahoma, arial, sans-serif;
+	}
+
+
+cite	{
+	float: none;
+	}
+
+ul	{
+	list-style: disc;
+	margin-bottom: 1em;
+	padding-left: 2em;
+	}
+
+ol	{
+	margin-bottom: 1em;
+	padding-left: 2em;
+	}
+
+div.section	{
+	clear: both;
+	padding-top: 50px;
+	}
+
+.copyright	{
+	padding-left:100px;
+	font-family: Arial, Helvetica, sans-serif;
+	font-weight: normal;
+	font-style: italic;
+	font-size: 60%;
+		}
+
+table {
+	padding: 0px;
+	margin:0px;
+	border-collapse:collapse;
+	border-spacing:1px;
+}
+
+hr {	color: #D9D9D9;
+	background: transparent none repeat scroll 0%;
+	border: solid #D9D9D9 1px;
+	height: 1px;
+}
+
+form	{
+	background-color:transparent;
+	color: #eacab4;
+	padding: 5px;
+	border: 0; }
+
+input,textarea	{
+	font-size: 13px;
+	font-family: verdana, sans-serif;
+	font-weight: bold;
+	color: #eacab4;
+	background-color: #404040;
+	border-color: #543D32; }
+
+
+
+/* ________________    Mini-Navigantion    ________________ */
+
+#h_line {
+	font-size:110%;
+	height: 32px;
+	width: 100%;
+	position:fixed;
+	top: 0px;
+	left: 0px;
+	background: #030303 url(images/grad2.png) 0 0 repeat-x;
+	text-align:left;
+	padding-bottom: 3px;
+	z-index: 1;
+	letter-spacing: -1px;
+	}
+
+#smsc  {
+	margin-top:15px;
+	margin-bottom: 10px;
+	height: 15px;
+	position:fixed;
+	top: -4px;
+	right: 2px;
+	z-index: 2;
+	}
+
+#hhvor {
+	margin-top: 10px;
+	padding: 0px 10px;
+	background-image : url(../css/images/vor.png);
+	background-repeat: no-repeat;
+	width:20px;
+	height:17px;
+	margin-right:8px;
+	}
+
+#hhzur {
+	margin-top: 10px;
+	padding: 0px 10px;
+	background-image : url(../css/images/zur.png);
+	background-repeat: no-repeat;
+	width:20px;
+	height:17px;
+	margin-right:12px;
+	}
+
+#hhhome {
+	margin-top: 10px;
+	padding: 0px 10px;
+	background-image : url(../css/images/home.png);
+	background-repeat: no-repeat;
+	width:20px;
+	height:17px;
+	margin-right:12px;
+	}
+
+#hhcont {
+	margin-top: 10px;
+	padding: 0px 10px;
+	background-image : url(../css/images/folder.png);
+	background-repeat: no-repeat;
+	width:20px;
+	height:17px;
+	margin-right:12px;
+	}
+
+#hhsite {
+	margin-top: 10px;
+	padding: 0px 10px;
+	background-image : url(../css/images/sitemap.png);
+	background-repeat: no-repeat;
+	width:20px;
+	height:17px;
+	margin-right:12px;
+	}
+
+#hhvor1 {
+	margin-top: 10px;
+	padding: 0px 10px;
+	background-image : url(../css/images/vor_no.png);
+	background-repeat: no-repeat;
+	width:20px;
+	height:17px;
+	margin-right:8px;
+	}
+
+#hhzur1 {
+	margin-top: 10px;
+	padding: 0px 10px;
+	background-image : url(../css/images/zur_no.png);
+	background-repeat: no-repeat;
+	width:20px;
+	height:17px;
+	margin-right:12px;
+	}
+
+
+/* ________________    Texteigenschaften    ________________ */
+
+
+img	{border: none;}
+
+.explan {
+	font-family: arial, verdana, tahoma, sans-serif;
+	border-bottom: 1px dotted #5f5f5f;
+	color: #E7F0B6;
+	cursor:help;}
+
+.spacing {
+	margin-left: 5px;
+}
+
+a:link {color: #b0b0de; text-decoration: none; }
+a:active {color: #C9494C; text-decoration: underline; }
+a:visited {color: #ed83f7; text-decoration: none; }
+a:hover {color: #6B6DC9; text-decoration: underline; }
+
+
+.highlight {
+	text-align: center;
+	background-color: #383838;
+	font-size: 110%;
+	border-style: solid;
+	border-width: thin;
+	border-top-color: #404040;
+	border-left-color: #505050;
+	border-right-color: #202020;
+	border-bottom-color: #202020;
+}
+
+.highlights {
+	text-align: left;
+	background-color: #383838;
+	font-size: 100%;
+	border-style: solid;
+	border-width: thin;
+	border-top-color: #404040;
+	border-left-color: #505050;
+	border-right-color: #202020;
+	border-bottom-color: #202020;
+}
+
+.note {
+	font-family: verdana, tahoma, arial, sans-serif;
+	font-size: 80%;
+	font-style: italic;
+	text-align: left;	
+	padding-left: 3em;
+	z-index:2;
+}
+
+.fussnote {
+	border-top: solid 1px gray;
+	margin-top: 1em;
+	clear: both;
+}
+
+.linke_spalte, .rechte_spalte {
+	clear:both;
+	margin-bottom:1em;
+}
+
+/* _____________  Formeltabellen  ___________*/
+
+.formel {
+	margin-left: 40px;
+	padding-left: 5px;
+	padding-right: 5px;
+	font-style: italic;
+	text-align: center;
+	vertical-align:middle;
+	white-space: nowrap;
+}
+.fnenner {
+	font-family: 'Times New Roman',Georgia,serif;
+	font-size: 120%;
+	vertical-align: text-top;
+	font-weight: bold;
+	font-style: italic;
+}
+.fzaehler {
+	font-family: 'Times New Roman',Georgia,serif;
+	font-size: 120%;
+	vertical-align: text-bottom;
+	font-weight: bold;
+	font-style: italic;
+	margin: 0px;
+}
+.fgleich {
+	font-family: 'Times New Roman',Georgia,serif;
+	font-size: 120%;
+ 	padding-left: 5px;
+	padding-right: 5px;
+	font-weight: bold;
+	font-style: italic;
+	margin: 0px;
+}
+.fwhere {
+ 	padding-left: 10px;
+	padding-right: 5px;
+	font-style: normal;
+	font-size:80%;
+	white-space: nowrap;
+	vertical-align:top;
+	margin: 1em;
+}
+.flegende {
+ 	padding-left: 10px;
+	min-width:100px;
+	text-align: left;
+	font-style: normal;
+	font-size:80%;
+	vertical-align: bottom;
+	white-space: nowrap;
+	margin: 0px;
+}
+.fsymbol {
+	font-family: 'Times New Roman',Georgia,serif;
+	font-style: italic;
+	font-size:110%;
+	vertical-align: bottom;
+	white-space: nowrap;
+	margin: 0px;
+}
+.ftext {
+	font-family: 'Times New Roman',Georgia,serif;
+	font-style: italic;
+	font-size:110%;
+	white-space: nowrap;
+}
+.fnummer {
+	min-width:100px;
+	text-align: right;
+	font-style: italic;
+	font-size:80%;
+	vertical-align: bottom;
+}
+.fut {  color: #876E5B; }
+
+
+.screenform {
+	text-align: right;	
+	padding: 0px;
+	z-index:2;
+}
+.nobreak {
+	white-space: nowrap;
+}
+
+.tx90 {	text-align: right;
+	-o-transform: rotate(-90deg);
+	-moz-transform: rotate(-90deg);
+	-webkit-transform: rotate(-90deg);
+	-ms-transform: rotate(-90deg);
+	transform: rotate(-90deg); 
+}
+
+
+
+
+
+/* ________________    Bildelemente    ________________ */
+
+
+
+.pictable_r, .pictable_rn {
+	float: none;
+	border-style: solid;
+	border-width: thin;
+	border-top-color: #505050;
+	border-left-color: #404040;
+	border-right-color: #202020;
+	border-bottom-color: #202020;
+	margin-left: 20px;
+	margin-bottom: 20px;
+	padding : 4px;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-size: 100%;
+	text-align: center;
+	background-color: transparent;
+}
+.pictable_l {
+	float: none;
+	border-style: solid;
+	border-width: thin;
+	border-top-color: #505050;
+	border-right-color: #202020;
+	border-left-color: #404040;
+	border-bottom-color: #202020;
+	margin-right: 20px;
+	margin-bottom: 20px;
+	padding : 4px;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-size: 14px;
+	font-style: italic;
+	text-align: center;
+	background-color: transparent;
+}
+.pictable_c {
+	float: none;
+	border-style: solid;
+	border-width: thin;
+	border-top-color: #505050;
+	border-left-color: #404040;
+	border-right-color: #202020;
+	border-bottom-color: #202020;
+	margin: 0 auto;
+	padding : 4px;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-size: 14px;
+	font-style: italic;
+	text-align: left;
+	background-color: transparent;
+}
+.inlinepic {
+	padding : 4px;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-size: 14px;
+	font-style: italic;
+	text-align: center;
+	margin-left: 20px;
+	margin-right: 20px;
+	background-color: transparent;
+}
+.leftext {
+	float: none;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-size: 14px;
+	font-style: italic;
+	text-align: left;
+	margin-left: 20px;
+	margin-bottom: 10px;
+	background-color: transparent;
+}
+
+.tabtable {
+	border-style: solid;
+	border-width: thin;
+	border-top-color: #A88574;
+	border-left-color: #5D483D;
+	border-right-color: #5D483D;
+	border-bottom-color: #5D483D;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-size: 90%;
+	background-color:#404040;
+}
+
+.tabtable th {
+	font-size: 100%;
+}
+
+.tabtable td {
+	padding: 0px;
+}
+
+.list td {
+	border-bottom: 1px dotted gray;
+	vertical-align:bottom;
+	padding-right:2em;
+}
+.iedoc {
+	padding-left: 5px;
+	background-image: url(images/document.png);
+	background-repeat: no-repeat;
+
+}
+.see {
+	font-size:80%;
+	font-style:italic;
+}
+
+
+
+/* _____  Tabelle taktisch- technische Daten  ________ */
+
+.ttd-rahmen {
+	float: none;
+	border-style: solid;
+	border-width: thin;
+	border-top-color: #505050;
+	border-left-color: #404040;
+	border-right-color: #202020;
+	border-bottom-color: #202020;
+	padding : 2px;
+	margin-right: 5px;
+	background-color:#353535;
+}
+
+.ttd {
+	border-style: none;
+	margin : 2px;
+	padding : 2px;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-size: 90%;
+	background-color:#353535;
+	white-space: nowrap;
+}
+.statistik {
+	border-style: none;
+	margin : 4px;
+	padding : 4px;
+	font-family: arial, verdana, tahoma, sans-serif;
+	font-size: 80%;
+	background-color:#353535;
+}
+.statistik th {
+	text-align: center;
+	font-weight: bold;
+	white-space: nowrap;
+}
+.statistik td {
+	text-align: right;
+	white-space: nowrap;
+}
+
+
+/* ____ Auf dem Handheld- Bildschirm nichtangezeigte Objekte ____ */
+
+.hh_no, ul.dropdown, ul.dropdown-horizontal {
+	display:none;
+}
+
+
+#sol, #enjoy, #social, #facebook {
+	display: none;
+}
+
+.alenia, .ams, .eads, .eldis, .ericson, .itt, .kongsberg {
+	display: none;
+}
+.LMC, .thalesatm, .thomson, .raytheon, .selex-si, .nrplgroup, .wera {
+	display: none;
+}
+
+.druckform, #copyright, .footer1 {
+	display: none;
+}
+
+.expent, #selex2, #sky_de, #sky_en, #sky_ro, #sky_es, #sky_fr, #sky_tr {
+	display: none;
+}
+
+
+#cpx_de, #cpx_en, #cpx_es, #cpx_fr, #cpx_ro, #cpx_tr,#self_de, #self_en, #self_tr {
+	display: none;
+}
+
+
+
