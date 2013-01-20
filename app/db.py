@@ -44,10 +44,10 @@ class AircraftDb(QObject):
 	def __init__(self):
 		QObject.__init__(self)
 		self.db = QSqlDatabase.addDatabase("QMYSQL")
-		self.db.setHostName("db.openadsb.com")
-		self.db.setDatabaseName("openadsb")
-		self.db.setUserName("openadsb")
-		self.db.setPassword("Popcorn12")
+		self.db.setHostName("db1.openadsb.com")
+		self.db.setDatabaseName("openadsb1")
+		self.db.setUserName("openadsb1user")
+		self.db.setPassword("Password#1")
 
 	#def result(self):
 		#pass
