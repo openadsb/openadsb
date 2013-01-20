@@ -1,0 +1,14 @@
+Project Outputs Generation Report
+---------------------------------
+Start Output Generation At 1:23:23 PM On 9/25/2012
+
+Output: Generates pick and place files
+Type  : Pick Place
+From  : Variant [[No Variations]] of PCB Document [openadsb_rev_a.PcbDoc]
+   Generated File[Pick Place for openadsb_rev_a.txt]
+
+
+Files Generated   : 1
+Documents Printed : 0
+
+Finished Output Generation At 1:23:25 PM On 9/25/2012
