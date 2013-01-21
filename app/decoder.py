@@ -107,7 +107,8 @@ class AdsbDecoder(QObject):
 		else:
 			print "  Need decoder for DF %u" % (df)
 			self.stats.DFOther += 1
-		
+	
+
 	def capabilitiesStr(self, ca):
 		if ca == 0:
 			caStr = "Level 1 transponder."
@@ -476,12 +477,12 @@ class AdsbDecoder(QObject):
 			else:
 				catStr = "Category %u" % (cat)
 			id = self.decodeChars(me[8:56])
-			print "  Aircraft identifier: %s, %s" % (id, catStr)
 			if crcgood:
 				a = self.lookupAircraft(aa)
 				if a == None:
 					a = self.recordAircraft(aa)
 				a.setIdentityInfo(id, catStr)
+				#print "  Aircraft identifier: %s, %s" % (id, catStr)
 				self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
 			
 		if tc >=5 and tc <=8:
@@ -496,7 +497,8 @@ class AdsbDecoder(QObject):
 			[lat, lon] = self.decodeCPR(cprlong, cprlat, 17, 90, oddeven)
 			posStr = " at (%f, %f)" % (lat, lon)
 			moveStr = self.decodeMovement(movement)
-			#print "  DF17: %hx %hx tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u mvmt=%u (%s)" % (ca, aa, tc, oddeven, timesync, cprlat, cprlong, movement, moveStr)
+			print "  DF17: %hx %hx tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u mvmt=%u (%s), crc=%u, pos %s:" % (ca, aa, tc, oddeven, timesync, cprlat, cprlong, movement, moveStr, posStr)
+			print pkt, crcgood
 			self.logMsg("  DF17: %hx %hx tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u mvmt=%u (%s)" % (ca, aa, tc, oddeven, timesync, cprlat, cprlong, movement, moveStr))
 			if crcgood:
 				# store aa, ONGROUND, posStr, moveStr
@@ -504,7 +506,7 @@ class AdsbDecoder(QObject):
 				if a == None:
 					a = self.recordAircraft(aa)
 				a.setGroundPos(posStr, moveStr, caStr)
-				self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
+				self.emit(SIGNAL("updateAircraftPosition(PyQt_PyObject)"), a)
 				# FIXME - emit updateAircraftPosition also
 			
 		if tc >=9 and tc <=22 and tc != 19:	
@@ -526,17 +528,18 @@ class AdsbDecoder(QObject):
 			oddeven = me[21:22].uint
 			cprlat = me[22:39].uint
 			cprlong = me[39:56].uint
-			#print "  DF17: %hx %hx %s tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u" % (ca, aa, altStr, tc, oddeven, timesync, cprlat, cprlong)
 			self.logMsg("  DF17: %hx %hx %s tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u" % (ca, aa, altStr, tc, oddeven, timesync, cprlat, cprlong))
 			[lat, lon] = self.decodeCPR(cprlong, cprlat, 17, 360, oddeven)
 			posStr = " at (%f, %f)" % (lat, lon)
+			print "  DF17: %hx %hx %s tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u, pos %s" % (ca, aa, altStr, tc, oddeven, timesync, cprlat, cprlong, posStr)
+			print pkt, crcgood
 			if crcgood:
 				# store aa, AIRBORNE, posStr, altStr, posUncertStr, altTypeStr
 				a = self.lookupAircraft(aa)
 				if a == None:
 					a = self.recordAircraft(aa)
 				a.setAirbornePos(lat, lon, alt, posUncertStr, altTypeStr, caStr)
-				self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
+				self.emit(SIGNAL("updateAircraftPosition(PyQt_PyObject)"), a)
 				# FIXME - emit updateAircraftPosition also
 
 		if tc == 19:
@@ -639,13 +642,14 @@ class AdsbDecoder(QObject):
 	# compact position record decoding
 	# Nb = 17 for airborne, 14 for intent, and 12 for TIS-B
 	# odd is True for odd packet, False for even
-	# range is 360 for airborne format, 90 for surface format
+	# range is 360.0 deg for airborne format, 90.0 deg for surface format
 	# fixme - the ODD packet seems to decode incorrectly... I think fixed.  No, still problem for some A/C
-	def decodeCPR(self, xz, yz, nbits, range, odd):
+	def decodeCPR(self, xz, yz, nbits, _range, odd):
 		# refer to C.2.6.5 and C.2.6.6
 		nz = 15		# number of latitude zones (fixed)
 		yz = float(yz)	# make sure treated as floating point
 		xz = float(xz)	# make sure treated as floating point
+		_range = float(_range)	# must be floating point
 
 		# our 'reference position' within 300 miles of airborne a/c or 45 miles on ground
 		[lats, lons] = self.origin
@@ -655,27 +659,31 @@ class AdsbDecoder(QObject):
 		else:
 			i = float(0)
 		# first latitude
-		dlat = 360.0 / (4 * nz - i)
-		j = math.floor(lats / dlat) + math.floor(0.5 + (self.mod(lats, dlat)/dlat) - (yz/2**nbits))
+		dlat = _range / (4 * nz - i)
+		j = math.floor(lats / dlat) + math.floor(0.5 + (self.mod(lats, dlat, _range)/dlat) - (yz/2**nbits))
 		rlat = dlat * (j + yz/2**nbits)
 		# then longitude
 		if self.NL(rlat, nz)-i > 0:
-			dlon = 360.0 / (self.NL(rlat, nz)-i)
+			dlon = _range / (self.NL(rlat, nz)-i)
 		else:	
-			dlon = 360.0
-		m = math.floor(lons / dlon) + math.floor(0.5 + (self.mod(lons, dlon)/dlon) - (xz/2**nbits))
+			dlon = _range
+		m = math.floor(lons / dlon) + math.floor(0.5 + (self.mod(lons, dlon, _range)/dlon) - (xz/2**nbits))
 		rlon = dlon * (m + xz/2**nbits)
 		return [rlat, rlon]
 
-	def mod(self, a, b):
+	def mod(self, a, b, _range):
 		if a < 0:
-			a += 360.0
-		return a - b * math.floor(a / b)
+			#a += 360.0
+			a += _range
+		m = a - b * math.floor(a / b)
+		print "a, b, m = ", a, b, m
+		return m
 
 	# NL - compute number of "longitude zones"
 	# refer to C.2.6.2
 	def NL(self, lat, nz):
 		nl = math.floor (2.0 * math.pi * pow(math.acos( 1.0 - ((1.0 - math.cos(math.pi/2.0/nz)) / pow(math.cos(math.pi/180.0*abs(lat)), 2.0))), -1))
+		print "NL=", nl
 		return nl;
 
 	def DecodeDF20(self, pkt):
@@ -1042,11 +1050,65 @@ class AdsbDecoder(QObject):
 		#d = (0x8d, 0xa8, 0x23, 0x3e, 0x58, 0x1b, 0x84, 0x86, 0xcc, 0x32, 0x53, 0x6f, 0x41, 0x23)
 		#d = (0x8d , 0xa6 , 0xb2 , 0x49 , 0x26 , 0x51 , 0x0d , 0x47 , 0x9a , 0x10 , 0x21 , 0xac , 0x93 , 0x83)
 		#d = (0x8d,0xac,0xf1,0x5b,0x99,0x44,0xcf,0x87,0xe8,0x44,0x86,0x32,0x94,0x52)
-		#decode(d)
-		#DecodeDF17(bitstring.BitArray(hex='0x8d71bf55200414b2c748205b4844'))
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x20 ,0x08 ,0x29 ,0xb7 ,0xd3 ,0xea )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb1 ,0x9a ,0x20 ,0x04 ,0x29 ,0xfc ,0x83 ,0x24 )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x60 ,0xbd ,0xf4 ,0x75 ,0x15 ,0xca ,0x1e ,0x51 ,0x0f ,0x21 )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x60 ,0xbd ,0xf0 ,0xde ,0xe5 ,0x99 ,0x70 ,0x74 ,0x4a ,0x80 )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x20 ,0x04 ,0xe0 ,0x71 ,0xc3 ,0x0d ,0xa0 ,0x21 ,0x0d ,0x67 )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x60 ,0xbd ,0xf4 ,0x73 ,0xf3 ,0xcb ,0x33 ,0x50 ,0x09 ,0xf8 )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x48 ,0x04 ,0x29 ,0x5e ,0xaf ,0x99 )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x60 ,0xbf ,0x00 ,0xdd ,0xb2 ,0xc4 ,0x66 ,0x58 ,0x72 ,0x13 )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x58 ,0xbd ,0xf4 ,0x72 ,0x9d ,0x67 ,0x8a ,0x2b ,0x40 ,0x4e )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x20 ,0x04 ,0xe0 ,0x71 ,0xc3 ,0x0d ,0xa0 ,0x21 ,0x0d ,0x67 )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x58 ,0xbf ,0x00 ,0xdc ,0x8a ,0xc5 ,0x90 ,0x25 ,0x5e ,0xe4 )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x58 ,0xbf ,0x00 ,0xdc ,0x60 ,0xc5 ,0xba ,0x74 ,0x79 ,0x7f )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x91 ,0xb0 ,0x9a ,0x48 ,0x04 ,0x29 ,0xcf ,0x68 ,0xe6 )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x91 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0xa1 ,0xca ,0xee )
+		self.decode(d)
+		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x58 ,0xbf ,0x04 ,0x71 ,0x79 ,0x68 ,0xaf ,0x1d ,0xba ,0xe2 )
+		self.decode(d)
+		#self.DecodeDF17(bitstring.BitArray(hex='0x8d71bf55200414b2c748205b4844'))
 		#DecodeDF17(bitstring.BitArray(hex='8da6b2495877847f8ee8829a8afc0563'))
 		#b = bitstring.BitArray('0b110010')
 		#print charDecode(b)
+		
 		return
 
 	    
+if __name__ == "__main__":
+	class a:
+		def __init__(self, args):
+			self.args = args
+	args = a
+	args.origin = (37.7, -122.02)
+	d = AdsbDecoder(args)
+	d.testPackets()

@@ -11,6 +11,16 @@ from PyQt4.QtGui import *
 
 thread = None
 
+# Subclass QCheckBox so we can send an aircraft ID with its' state change signal
+class MyCheckBox(QCheckBox):
+	def __init__(self, aa, parent = None):
+		QCheckBox.__init__(self, parent)
+		self.aa = aa
+		self.connect(self, SIGNAL("stateChanged(int)"), self.myStateChanged)
+
+	def myStateChanged(self, state):
+		self.emit(SIGNAL("stateChanged(int, int)"), self.aa, state)
+
 # Subclass QTableWidgetItem
 class MyTableWidgetItem(QTableWidgetItem):
 	def __init__(self, item):
@@ -31,8 +41,9 @@ class MyTableWidgetItem(QTableWidgetItem):
 
 # Subclass QTableWidget
 class MyTableWidget(QTableWidget):
-    def __init__(self, hhdr):
+    def __init__(self, hhdr, mainWindow):
         QTableWidget.__init__(self, 0, len(hhdr))
+	self.mainWindow = mainWindow
 	self.sortAlways = False		# if true, sort on each table update
 	self.mutex = QMutex()		
 	self.setHorizontalHeaderLabels(hhdr)
@@ -53,13 +64,17 @@ class MyTableWidget(QTableWidget):
 	rows = self.rowCount()
 	self.setRowCount(rows+1)
 	m = rows
-	n = 0
+	checkbox = MyCheckBox(int(id), self)		# 'plot' checkbox in first column
+	checkbox.setChecked(True)
+	self.setCellWidget(m, 0, checkbox)
+	self.connect(checkbox, SIGNAL("stateChanged(int, int)"), self.mainWindow.gmapsWindow.setTrackVisible)
+	n = 1
 	for item in columnlist:
                 newitem = MyTableWidgetItem(item)
                 self.setItem(m, n, newitem)
 		n += 1
 	self.rownum[int(id)] = m
-	self.item(m, 1).aa = int(id)	# AA in column 1
+	self.item(m, 2).aa = int(id)	# AA in column 2
 	self.mutex.unlock()
 	self.resize()
 	if self.sortAlways:
@@ -75,10 +90,21 @@ class MyTableWidget(QTableWidget):
 		self.delRow(row)
 	return
 
+    def setHighlightRow(self, aa, val):
+	row = self.rownum[int(aa)]
+	if row != None:
+		if val:
+			print "setHighlightRow on for row ", row
+			self.selectRow(row);
+		else:
+			print "setHighlightRow off for row ", row
+			self.selectRow(-1);
+	return
+
     def updateRowByID(self, id, columnlist):
 	row = self.rownum[int(id)]
 	if row != None:
-		n = 0
+		n = 1
 		for col in columnlist:
 			item = self.item(row, n)
 			item.setText(col)
@@ -93,18 +119,18 @@ class MyTableWidget(QTableWidget):
 	print "row = %d", row
 	if row != None:
 		text = "N%s" % i.registrationStr		# fixme - USA only
-		item = self.item(row, 19)
+		item = self.item(row, 20)
 		item.setText(text)
 
-		item = self.item(row, 20)
+		item = self.item(row, 21)
 		item.setText(i.acTypeStr)
 
 		text = "%s %s %s, %u seats, %u %s engines with %s" % (i.yearBuilt, i.acMfgStr, i.acModelStr, i.numSeats, i.numEng, i.engTypeStr, i.engPowerStr)
-		item = self.item(row, 21)
+		item = self.item(row, 22)
 		item.setText(text)
 
 		text = "%s, %s, %s %s" % (i.ownerStr, i.ownerCityStr, i.ownerStateStr, i.ownerCountryStr)
-		item = self.item(row, 22)
+		item = self.item(row, 23)
 		item.setText(text)
 	if self.sortAlways:
 		self.doSort(self.lastSortCol, self.lastSortOrder)
@@ -131,7 +157,7 @@ class MyTableWidget(QTableWidget):
 	# rebuild our index
 	self.rownum = dict()
 	for row in range(self.rowCount()):
-		id = self.item(row, 1).aa	# first row has aa
+		id = self.item(row, 2).aa	# aa
 		self.rownum[id] = row
 	self.mutex.unlock()
 
@@ -139,11 +165,11 @@ class MyTableWidget(QTableWidget):
 # TableWidget for ADSB display
 class AdsbTableWidget(MyTableWidget):
 
-	def __init__(self):
-		hdrs = [	'Time', 'ICAO24', 'Country', 'Flight ID', 'Status', 'Range', 'Elevation', 
+	def __init__(self, mainWindow):
+		hdrs = [	'Plot', 'Time', 'ICAO24', 'Country', 'Flight ID', 'Status', 'Range', 'Elevation', 
 				'Azimuth', 'Position', 'Altitude', 'Vertical rate', 'Heading', 'Airspeed', 
 				'Ground speed', 'Squawk', 'Category', 'Max speed', 'Packets', 'Track Points', 'Tail Number', 'Type', 'Kind', 'Owner' ]
-		MyTableWidget.__init__(self, hdrs)
+		MyTableWidget.__init__(self, hdrs, mainWindow)
 
 	# fixme - squawk should highlight for special codes
 	# 1200 (VFR)
@@ -155,11 +181,9 @@ class AdsbTableWidget(MyTableWidget):
 
 	# These are SLOTS
 	def addAircraft(self, ac):
-		#print "addRow: %X" % (ac.aa)
 		self.addRow(ac.aa, [ str(ac.timestamp), ("%X"%ac.aa), ac.countryStr, ac.idStr, ac.fsStr, ac.rangeStr, ac.elevStr, ac.bearingStr, 
 					ac.posStr, str(ac.alt), ac.vertStr, ac.heading, ac.velStr,
 					'', ac.squawkStr, ac.catStr, ac.riStr, str(ac.pkts), str(len(ac.track)), '', '', '', '' ])
-		#QSound.play("TerminalBeep.wav");
 		QSound.play("beep2.wav");
 
 	def updateAircraft(self, ac):
@@ -167,12 +191,21 @@ class AdsbTableWidget(MyTableWidget):
 					ac.posStr, str(ac.alt), ac.vertStr, ac.headingStr, ac.velStr,
 					'', ac.squawkStr, ac.catStr, ac.riStr, str(ac.pkts), str(len(ac.track)) ])
 
+	def updateAircraftPosition(self, ac):
+		return self.updateAircraft(ac)
+
 	def delAircraft(self, ac):
-		#print "delAircraft called"
 		self.delRowByID(ac.aa)
 	
 	def updateAircraftDbInfo(self, info):
 		# called from dbThread
 		self.updateDbInfo(info)
-		print info
+
+	def highlightAircraft(self, aa):
+		# highlight the row corresponding to this ID
+		self.setHighlightRow(aa, True)
+
+	def unhighlightAircraft(self, aa):
+		# highlight the row corresponding to this ID
+		self.setHighlightRow(aa, False)
 

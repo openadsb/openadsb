@@ -81,7 +81,7 @@ class MainWindow(QMainWindow):
 		toolbar.show()
 
 		# Aircraft Table 
-		self.t = tablewidget.AdsbTableWidget()
+		self.t = tablewidget.AdsbTableWidget(self)
 		self.t.show()
 		resizeAction.triggered.connect(self.t.resizeColumnsToContents)
 
@@ -89,8 +89,9 @@ class MainWindow(QMainWindow):
 		self.dec = self.reader.getDecoder()
 		self.t.connect(self.dec, SIGNAL("addAircraft(PyQt_PyObject)"), self.t.addAircraft)
 		self.t.connect(self.dec, SIGNAL("updateAircraft(PyQt_PyObject)"), self.t.updateAircraft)
+		self.t.connect(self.dec, SIGNAL("updateAircraftPosition(PyQt_PyObject)"), self.t.updateAircraftPosition)
 		self.t.connect(self.dec, SIGNAL("delAircraft()"), self.t.delAircraft)
-
+		
 		# Create a progress bar to show the current RX level
 		self.rxbar = QProgressBar()
 		self.rxbar.setRange(0, 4096)
@@ -176,13 +177,16 @@ class MainWindow(QMainWindow):
 		#webWindow.load(url)
 		#webWindow.show()
 
-		webWindow = gmaps.gmaps()
-		webWindow.show()
-		self.t.connect(self.dec, SIGNAL("updateAircraft(PyQt_PyObject)"), webWindow.updateAircraft)
+		self.gmapsWindow = gmaps.gmaps()
+		self.gmapsWindow.show()
+		self.t.connect(self.dec, SIGNAL("updateAircraftPosition(PyQt_PyObject)"), self.gmapsWindow.updateAircraftPosition)
+		self.t.connect(self.gmapsWindow, SIGNAL("highlightAircraft(int)"), self.t.highlightAircraft)
+		self.t.connect(self.gmapsWindow, SIGNAL("unhighlightAircraft(int)"), self.t.unhighlightAircraft)
 		
+		# fixme - Google Earth plugin doesn't work yet
 		earthWindow = gearth.gearth()
 		earthWindow.show()
-		self.t.connect(self.dec, SIGNAL("updateAircraft(PyQt_PyObject)"), earthWindow.updateAircraft)
+		#self.t.connect(self.dec, SIGNAL("updateAircraft(PyQt_PyObject)"), earthWindow.updateAircraft)
 		
 
 		# create log message textbox 
@@ -206,7 +210,7 @@ class MainWindow(QMainWindow):
 
 		hsplit = QSplitter()
 		hsplit.addWidget(statsWindow)
-		hsplit.addWidget(webWindow)
+		hsplit.addWidget(self.gmapsWindow)
 		hsplit.addWidget(earthWindow)
 		#hbox2 = QHBoxLayout()
 		#hbox2.addWidget(statsWindow)
@@ -251,6 +255,7 @@ class MainWindow(QMainWindow):
 		OPENADSB_WIKI_URL = "http://www.openadsb.com/wiki"
 		QDesktopServices.openUrl(QUrl(OPENADSB_WIKI_URL, QUrl.TolerantMode))
 
+	# bk - make new one - using server_new and client
 	def cfgServer(self, enable, port, maxConn, fmt):
 		(accepted, enable, port, maxConn, fmt) = dlg_server.DlgConfigServer.get(self.server != None)
 		if accepted:

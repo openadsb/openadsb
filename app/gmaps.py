@@ -6,94 +6,124 @@ from PyQt4.QtGui import *
 from PyQt4.QtWebKit import *
 import sys
 
-# fixme - rather than just adding each line segment, maintain a javascript dict of the AA to polyline object
-# then addline will lookup the MVCArray of Polyline object, and push() the new point onto the end.
-# it will also allow us to remove line segments by AA also (hide them, delete them, etc), based on Qt signals
 
 js = """
+var plines = {};
+var infoWindow;
+var prevZIndex;
 function moveNewCenter()
 {
     map.setCenter(new google.maps.LatLng(37.4419, -122.1419), 13);
 }
-function bktest2()
+function createPolyline(lat, lon, alt)
 {
-    alert("bktest2() called");
-    map.setCenter(new google.maps.LatLng(37.4419, -122.1419), 13);
-}
-function addLine(lat1, lon1, h1, lat2, lon2, h2)
-{
-    var coords = [
-	new google.maps.LatLng(lat1, lon1, h1),
-	new google.maps.LatLng(lat2, lon2, h2)
-    ];
     var pline = new google.maps.Polyline({
-	path: coords,
-	strokeColor: "#FF0000",
-	strokeOpacity: 1.0,
+	strokeColor: "#FF0000",		// red
+	strokeOpacity: 0.8,
 	strokeWeight: 5
     });
     pline.setMap(map);
-    //map.setCenter(new google.maps.LatLng(lat2, lon2), h2)
-    google.maps.event.addListener(pline, 'mouseover', function() {
-     pline.setOptions({
-       strokeOpacity: 1,
-       strokeWeight: 10 
-     });
-   });
 
+    // highlight track when you mouse over, and display an arrow at the end of the track
+    google.maps.event.addListener(pline, 'mouseover', function() {
+     var arrow = {
+	icon: {
+		path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+		strokeColor: "#000000",
+		strokeOpacity: 1,
+		strokeWeight: 1
+	},
+	offset: '100%'
+     };
+     prevZIndex = pline.zIndex;
+     pline.setOptions({
+       icons: [arrow],
+       strokeColor: "#000000",		// black
+       strokeOpacity: 1.0,
+       strokeWeight: 5,
+       zIndex: 100			// on top of other lines
+     });
+     highlighter.highlight(pline.aa);
+   });
    google.maps.event.addListener(pline, 'mouseout', function() {
      pline.setOptions({
-       strokeOpacity: 0.5,
-       strokeWeight: 5
+       icons: [ ],
+       strokeColor: "#FF0000",		// red
+       strokeOpacity: 0.8,
+       strokeWeight: 5,
+       zIndex: prevZIndex
      });
+     highlighter.unhighlight(pline.aa);
    });
-
+   //google.maps.event.addListener(pline, 'click', function(event) {
+     	//infoWindow = new google.maps.InfoWindow();
+     	//var str = "<b>" + pline.aa + "</b>";
+     	//infoWindow.setContent(str);
+     	//infoWindow.setPosition(event.latLng);
+	//infoWindow.open(map);
+   //});
+   return pline
+}
+function getNumPlines()
+{
+    var len = Object.keys(plines).length;
+    return len;
+}
+function showTrack(aa, enable)
+{
+    var pline = plines[aa];
+    if(pline != null) {
+	if(enable) { pline.setVisible(true); }
+	else { pline.setVisible(false); }
+    }
+}
+function plotTrack(aa, lat, lon, alt)
+{
+    var pline = plines[aa];
+    if(pline == null) {
+	    pline = createPolyline(lat, lon, alt);
+	    pline.aa = aa;
+	    plines[aa] = pline;
+    }
+    var path = pline.getPath(); 
+    var pt = new google.maps.LatLng(lat, lon, alt);
+    //printer.text('javascript plotTrack(): ' + lat + ' ' + lon + ' ' + alt)
+    path.push(pt);
+    //var n = getNumPlines();
+    //printer.text(n);
 }
 """
-
-# This hack needed to make drag/zoom work. See http://qt-project.org/forums/viewthread/1643
-#class ChromePage(QWebPage):
-	#def userAgentForUrl(self, url):	# now, seems to work only without this?  01/13
-		#return 'Chrome/1.0'
 
 class gmaps(QWebView):
 	def __init__(self):
 		QWebView.__init__(self)
-		#self.setPage(ChromePage())
 		self.setPage(QWebPage())
 		self.settings().setAttribute(QWebSettings.JavascriptEnabled, True)
-		# bk - FIXME - this is different for Windows and MacOS
-		#print "application path: ",QApplication.applicationDirPath() 
-		#print "file path: ",QApplication.applicationFilePath() 
-		#print "Executable is in",loc.absolutePath();
-		#url = QUrl.fromLocalFile("/Users/bk/src/openadsb/app/gmap.html")	#mac
-		#url = QUrl.fromLocalFile(QApplication.applicationDirPath() + "/gmap.html")	#mac
-		#url = QUrl.fromLocalFile("X:/src/openadsb/app/gmap.html")		#windows
 		loc = QFileInfo(sys.argv[0])
-		print "localtion is: ",loc.absolutePath() + "/gmap.html";
 		url = QUrl.fromLocalFile(loc.absolutePath() + "/gmap.html")
 		self.load(url)
 		self.frame = self.page().mainFrame()
 		self.frame.evaluateJavaScript(js);		# load the functions
+		# Allow javascript to call back into Qt
+                printer = ConsolePrinter(self.frame)
+                self.frame.addToJavaScriptWindowObject('printer', printer)
+                self.frame.evaluateJavaScript("printer.text('Testing Javascript printing from Qt... good!');")
+                highlighter = TableHighlighter(self.frame, self)
+                self.frame.addToJavaScriptWindowObject('highlighter', highlighter)
 
-	# start, end are both [ lon, lat, alt, heading ]
-	def drawTrackSeg(self, start, end):
-		[ lon1, lat1, alt1, h1 ] = start
-		[ lon2, lat2, alt2, h2 ] = end
-		str = "addLine(%f, %f, %f, %f, %f, %f);" % (lat1, lon1, alt1, lat2, lon2, alt2)
-		self.frame.evaluateJavaScript(str)
 
 	# SLOTS
-	# FIXME - this is called for more than just position updates... Only update map when position changes.
-	def updateAircraft(self, ac):
+	def updateAircraftPosition(self, ac):
 		l = len(ac.track)
-		#print "gmaps: updateAircraft, len = ", l
 		if l > 2:
 			end = ac.track[l-1]
-			start = ac.track[l-2]
-			#print "***************************** start = ", start
-			#print "***************************** end = ", end
-			self.drawTrackSeg(start, end)
+			[ lon, lat, alt, head ] = end
+			s = "plotTrack(%s, %f, %f, %f);" % (ac.aa, lat, lon, alt)
+			self.frame.evaluateJavaScript(s)
+
+	def setTrackVisible(self, aa, enable):
+		s = "showTrack(%s, %d);" % (aa, enable)
+		self.frame.evaluateJavaScript(s)
 		
 class ConsolePrinter(QObject):
     def __init__(self, frame, parent=None):
@@ -108,4 +138,20 @@ class ConsolePrinter(QObject):
     def init_done(self, message):
 	print message
 
-	
+
+class TableHighlighter(QObject):
+    def __init__(self, frame, parent=None):
+        super(TableHighlighter, self).__init__(parent)
+	self.parent = parent
+	self.frame = frame
+
+    @pyqtSlot(str)
+    def highlight(self, aa):
+        print "will highlight table id ", aa
+	self.parent.emit(SIGNAL("highlightAircraft(int)"), int(aa))
+
+    @pyqtSlot(str)
+    def unhighlight(self, aa):
+        print "will unhighlight table id ", aa
+	self.parent.emit(SIGNAL("unhighlightAircraft(int)"), int(aa))
+

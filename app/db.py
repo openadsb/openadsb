@@ -215,7 +215,7 @@ class AircraftDb(QObject):
 	def addAircraft(self, ac):
 		i = AircraftDbInfo(ac.aa)
 		aa = "%X"%ac.aa
-		print "AircraftDb() addAircraft called for %s" % aa
+		#print "AircraftDb() addAircraft called for %s" % aa
 		[ ok, i.registrationStr, i.ownerStr, i.ownerCityStr, i.ownerStateStr, i.ownerCountryStr, accode, ecode, i.yearBuilt ] = self.lookupAircraftByICAO24(aa)
 		if ok:
 			[ i.acMfgStr, i.acModelStr, i.acTypeStr, i.numEng, i.engTypeStr, i.numSeats ] = self.lookupModelByMfgCode(accode)
