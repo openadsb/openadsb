@@ -14,3 +14,5 @@ is given in the source files, where appropriate.
 
 For questions or comments, please contact:
 info@openadsb.com
+
+![screenshot](openadsb/app/openadsb_screenshot1.jpg)
