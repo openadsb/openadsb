@@ -12,7 +12,11 @@ import httplib
 import time, os, stat
 
 def file_age_in_seconds(pathname):
-    return time.time() - os.stat(pathname)[stat.ST_MTIME]
+    try:
+	ftime = os.stat(pathname)[stat.ST_MTIME]
+    except:
+	return 1e9	# hack
+    return time.time() - ftime
 
 class flight():
 	def __init__(self):
