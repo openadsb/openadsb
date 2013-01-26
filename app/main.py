@@ -250,6 +250,10 @@ class MainWindow(QMainWindow):
 		self.connect(self.dec, SIGNAL("addAircraft(PyQt_PyObject)"), self.dbThread.db.addAircraft)
 		self.connect(self.dbThread.db, SIGNAL("updateAircraftDbInfo(PyQt_PyObject)"), self.t.updateAircraftDbInfo)
 
+		# control DAC automatically
+		if self.args.ditherdac:
+			self.ditherdac = DitherDAC(self)
+
 	def openWiki(self):
 		# open in browser
 		OPENADSB_WIKI_URL = "http://www.openadsb.com/wiki"
@@ -305,6 +309,22 @@ class MainWindow(QMainWindow):
 			self.logfileSize.setText("%.2f MB"%(float(stats.logfileSize)/1024/1024))
 
 		
+# Sweep the DAC value around, to improve dynamic range
+class DitherDAC(QObject):
+	def __init__(self, mainWindow):
+		QObject.__init__(self, parent = None)
+		self.mainWindow = mainWindow
+		self.dactimer = QTimer()
+		self.connect(self.dactimer, SIGNAL("timeout()"), self.dacupdate)
+		self.dactimer.start(500)
+
+	def dacupdate(self):
+		# called periodically by timer
+		high = 3000
+		low = 1200
+		r = qrand() % ((high+1) - low) + low
+		self.mainWindow.daclevel.setValue(r)
+
 		
 #def signalHandler(signal, frame):
 	#print "Ctrl+C received... shutting down"
@@ -330,11 +350,12 @@ def main():
 	parser.add_argument('-c', '--count', dest="count", help="how many packets to process", metavar="NUM", default=-1)
 	parser.add_argument('-n', '--nogui', dest="nogui", help="command-line only - no GUI", action="store_true")
 	parser.add_argument('-v', '--verbose', dest="verbose", metavar="LEVEL", help="increasing output levels 1 to 5")
-	#parser.add_argument('-o', '--output', dest='output', metavar="FILE", help="log packets to FILE")
 	parser.add_argument('-H', '--host', dest="host", help="read packets from ipaddr:port")
 	parser.add_argument('-S', '--server', dest="server", metavar="PORT", help="start a packet server on this host on port PORT")
 	parser.add_argument('-d', '--dac', dest="daclevel", metavar="VALUE", help="set the DAC level to VALUE (0 to 4096?)", default=default_daclevel)
+	parser.add_argument('-D', '--dither', dest="ditherdac", help="automatically control DAC value", action='store_true' )
 	parser.add_argument('-O', '--origin', dest="origin", nargs=2, metavar="FLOAT",  help="Latitude and Longitude of Origin in degrees (-90 to 90, -180 to 180)", default=default_origin)
+	#parser.add_argument('-o', '--output', dest='output', metavar="FILE", help="log packets to FILE")
 	parser.add_argument('-p')		# MacOS starts programs with -psn_XXXXXXX "process serial number" argument.  Ignore it. FIXME SetFrontProcess()
 	args = parser.parse_args()
 	print args
