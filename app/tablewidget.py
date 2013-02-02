@@ -6,6 +6,7 @@
 import sys
 import time
 import aircraft
+import flightradar24
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
@@ -116,7 +117,6 @@ class MyTableWidget(QTableWidget):
 
     def updateDbInfo(self, i):
 	row = self.rownum[i.aa]
-	print "row = %d", row
 	if row != None:
 		text = "N%s" % i.registrationStr		# fixme - USA only
 		item = self.item(row, 20)
@@ -132,6 +132,19 @@ class MyTableWidget(QTableWidget):
 		text = "%s, %s, %s %s" % (i.ownerStr, i.ownerCityStr, i.ownerStateStr, i.ownerCountryStr)
 		item = self.item(row, 23)
 		item.setText(text)
+	if self.sortAlways:
+		self.doSort(self.lastSortCol, self.lastSortOrder)
+	#self.resize()
+	return
+	
+    def updateFR24Info(self, i):
+	aa = int(i.aa, 16)			
+	row = self.rownum[aa]
+	if row != None:
+		text = "%s to %s" % (i.originVerbose, i.destinationVerbose)
+		item = self.item(row, 24)
+		item.setText(text)
+
 	if self.sortAlways:
 		self.doSort(self.lastSortCol, self.lastSortOrder)
 	#self.resize()
@@ -168,7 +181,8 @@ class AdsbTableWidget(MyTableWidget):
 	def __init__(self, mainWindow):
 		hdrs = [	'Plot', 'Time', 'ICAO24', 'Country', 'Flight ID', 'Status', 'Range', 'Elevation', 
 				'Azimuth', 'Position', 'Altitude', 'Vertical rate', 'Heading', 'Airspeed', 
-				'Ground speed', 'Squawk', 'Category', 'Max speed', 'Packets', 'Track Points', 'Tail Number', 'Type', 'Kind', 'Owner' ]
+				#'Ground speed', 'Squawk', 'Category', 'Max speed', 'Packets', 'Track Points', 'Tail Number', 'Type', 'Kind', 'Owner' ]
+				'Ground speed', 'Squawk', 'Category', 'Max speed', 'Packets', 'Track Points', 'Tail Number', 'Type', 'Kind', 'Owner', 'From/To' ]
 		MyTableWidget.__init__(self, hdrs, mainWindow)
 
 	# fixme - squawk should highlight for special codes
@@ -183,7 +197,8 @@ class AdsbTableWidget(MyTableWidget):
 	def addAircraft(self, ac):
 		self.addRow(ac.aa, [ str(ac.timestamp), ("%X"%ac.aa), ac.countryStr, ac.idStr, ac.fsStr, ac.rangeStr, ac.elevStr, ac.bearingStr, 
 					ac.posStr, str(ac.alt), ac.vertStr, ac.heading, ac.velStr,
-					'', ac.squawkStr, ac.catStr, ac.riStr, str(ac.pkts), str(len(ac.track)), '', '', '', '' ])
+					#'', ac.squawkStr, ac.catStr, ac.riStr, str(ac.pkts), str(len(ac.track)), '', '', '', '' ])
+					'', ac.squawkStr, ac.catStr, ac.riStr, str(ac.pkts), str(len(ac.track)), '', '', '', '', '' ])
 		QSound.play("beep2.wav");
 
 	def updateAircraft(self, ac):
@@ -200,6 +215,10 @@ class AdsbTableWidget(MyTableWidget):
 	def updateAircraftDbInfo(self, info):
 		# called from dbThread
 		self.updateDbInfo(info)
+
+	def updateAircraftFR24Info(self, info):
+		# called from fr24Thread
+		self.updateFR24Info(info)
 
 	def highlightAircraft(self, aa):
 		# highlight the row corresponding to this ID

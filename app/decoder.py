@@ -497,8 +497,7 @@ class AdsbDecoder(QObject):
 			[lat, lon] = self.decodeCPR(cprlong, cprlat, 17, 90, oddeven)
 			posStr = " at (%f, %f)" % (lat, lon)
 			moveStr = self.decodeMovement(movement)
-			print "  DF17: %hx %hx tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u mvmt=%u (%s), pos %s:" % (ca, aa, tc, oddeven, timesync, cprlat, cprlong, movement, moveStr, posStr)
-			print pkt, crcgood
+			#print "  DF17: %hx %hx tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u mvmt=%u (%s), pos %s:" % (ca, aa, tc, oddeven, timesync, cprlat, cprlong, movement, moveStr, posStr)
 			self.logMsg("  DF17: %hx %hx tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u mvmt=%u (%s)" % (ca, aa, tc, oddeven, timesync, cprlat, cprlong, movement, moveStr))
 			if crcgood:
 				# store aa, ONGROUND, posStr, moveStr
@@ -531,8 +530,8 @@ class AdsbDecoder(QObject):
 			self.logMsg("  DF17: %hx %hx %s tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u" % (ca, aa, altStr, tc, oddeven, timesync, cprlat, cprlong))
 			[lat, lon] = self.decodeCPR(cprlong, cprlat, 17, 360, oddeven)
 			posStr = " at (%f, %f)" % (lat, lon)
-			print "  DF17: %hx %hx %s tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u, pos %s" % (ca, aa, altStr, tc, oddeven, timesync, cprlat, cprlong, posStr)
-			print pkt, crcgood
+			#print "  DF17: %hx %hx %s tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u, pos %s" % (ca, aa, altStr, tc, oddeven, timesync, cprlat, cprlong, posStr)
+			#print pkt, crcgood
 			if crcgood:
 				# store aa, AIRBORNE, posStr, altStr, posUncertStr, altTypeStr
 				a = self.lookupAircraft(aa)
@@ -673,17 +672,16 @@ class AdsbDecoder(QObject):
 
 	def mod(self, a, b, _range):
 		if a < 0:
-			#a += 360.0
 			a += _range
 		m = a - b * math.floor(a / b)
-		print "a, b, m = ", a, b, m
+		#print "a, b, m = ", a, b, m
 		return m
 
 	# NL - compute number of "longitude zones"
 	# refer to C.2.6.2
 	def NL(self, lat, nz):
 		nl = math.floor (2.0 * math.pi * pow(math.acos( 1.0 - ((1.0 - math.cos(math.pi/2.0/nz)) / pow(math.cos(math.pi/180.0*abs(lat)), 2.0))), -1))
-		print "NL=", nl
+		#print "NL=", nl
 		return nl;
 
 	def DecodeDF20(self, pkt):
@@ -942,48 +940,54 @@ class AdsbDecoder(QObject):
 			c = "US Military"
 		elif aa >= 0xA00000 and aa < 0xB00000:
 			c = "USA"
-		elif aa >= 0x780000 and aa < 0x7C0000:
-			c = "China"
 		elif aa >= 0x840000 and aa < 0x880000:
 			c = "Japan"
 		elif aa >= 0xC00000 and aa < 0xC40000:
 			c = "Canada"
 		elif aa >= 0x0D0000 and aa < 0x0D8000:
 			c = "Mexico"
-		elif aa >= 0x7C0000 and aa < 0x800000:
-			c = "Australia"
-		elif aa >= 0x758000 and aa < 0x760000:
-			c = "Philippines"
-		elif aa >= 0x768000 and aa < 0x770000:
-			c = "Singapore"
-		elif aa >= 0x4CA000 and aa < 0x4CB000:
-			c = "Ireland"
-		elif aa >= 0x718000 and aa < 0x720000:
-			c = "Korea"
-		elif aa >= 0xC80000 and aa < 0xC88000:
-			c = "New Zealand"
-		elif aa >= 0x3C0000 and aa < 0x400000:
-			c = "Germany"
-		elif aa >= 0x899000 and aa < 0x899400:
-			c = "Taiwan"
+		elif aa >= 0x100000 and aa < 0x200000:
+			c = "Russian Federation"
+		elif aa >= 0x300000 and aa < 0x340000:
+			c = "Italy"
 		elif aa >= 0x380000 and aa < 0x3c0000:
 			c = "France"
-		elif aa >= 0xE80000 and aa < 0xE81000:
-			c = "Chile"
-		elif aa >= 0x710000 and aa < 0x718000:
-			c = "Saudi Arabia"
 		elif aa >= 0x400000 and aa < 0x440000:
 			c = "United Kingdom"
 		elif aa >= 0x480000 and aa < 0x488000:
 			c = "Netherlands"
-		elif aa >= 0x896000 and aa < 0x897000:
-			c = "United Arab Emirates"
-		elif aa >= 0x750000 and aa < 0x758000:
-			c = "Malaysia"
 		elif aa >= 0x490000 and aa < 0x498000:
 			c = "Portugal"
-		elif aa >= 0x100000 and aa < 0x200000:
-			c = "Russian Federation"
+		elif aa >= 0x4B0000 and aa < 0x4B8000:
+			c = "Switzerland"
+		elif aa >= 0x4CA000 and aa < 0x4CB000:
+			c = "Ireland"
+		elif aa >= 0x710000 and aa < 0x718000:
+			c = "Saudi Arabia"
+		elif aa >= 0x718000 and aa < 0x720000:
+			c = "Korea"
+		elif aa >= 0x738000 and aa < 0x740000:
+			c = "Israel"
+		elif aa >= 0x750000 and aa < 0x758000:
+			c = "Malaysia"
+		elif aa >= 0x758000 and aa < 0x760000:
+			c = "Philippines"
+		elif aa >= 0x768000 and aa < 0x770000:
+			c = "Singapore"
+		elif aa >= 0x780000 and aa < 0x7C0000:
+			c = "China"
+		elif aa >= 0x7C0000 and aa < 0x800000:
+			c = "Australia"
+		elif aa >= 0x880000 and aa < 0x888000:
+			c = "Thailand"
+		elif aa >= 0x896000 and aa < 0x897000:
+			c = "United Arab Emirates"
+		elif aa >= 0x899000 and aa < 0x899400:
+			c = "Taiwan"
+		elif aa >= 0xC80000 and aa < 0xC88000:
+			c = "New Zealand"
+		elif aa >= 0xE80000 and aa < 0xE81000:
+			c = "Chile"
 		else:
 			c = ""		# fixme - add complete list
 		return c

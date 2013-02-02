@@ -50,7 +50,6 @@ class Aircraft(QObject):
 		self.caStr = ""
 		self.catStr = ""
 		self.posStr = ""
-		self.vsStr = ""
 		self.moveStr = ""
 		self.altStr = ""
 		self.posUncertStr = ""
@@ -146,7 +145,7 @@ class Aircraft(QObject):
 			self.posStr = posStr
 		self.moveStr = moveStr
 		self.caStr = caStr
-		self.vsStr = "On Ground"
+		self.fsStr = "On Ground"
 		self.timestamp = time.time()
 		self.pos_timestamp = self.timestamp = time.time()
 
@@ -161,12 +160,10 @@ class Aircraft(QObject):
 		self.elevStr = ("%.0f" % self.elev)
 		if alt != 0:
 			self.alt = alt
-		#if altStr != "":
-			#self.altStr = altStr
 		self.posUncertStr = posUncertStr
 		self.altTypeStr = altTypeStr
 		self.caStr = caStr
-		self.vsStr = "Airborne"
+		self.fsStr = "Airborne"
 		self.track += [(lon, lat, alt, t)]		# fixme - add heading
 		#self.pt = kml.newpoint(coords=[(lon,lat,alt)], altitudemode='absolute')
 		#self.pt.iconstyle = simplekml.IconStyle(heading=self.heading,icon=icon)
@@ -184,7 +181,7 @@ class Aircraft(QObject):
 			self.altStr = altStr
 		self.posUncertStr = posUncertStr
 		self.altTypeStr = altTypeStr
-		self.vsStr = "Airborne"
+		self.fsStr = "Airborne"
 		self.pos_timestamp = self.timestamp = time.time()
 
 	def setAirborneVel(self, velStr, heading, vertStr, caStr):
@@ -193,7 +190,7 @@ class Aircraft(QObject):
 		self.heading = heading
 		self.headingStr = self.getHeadingStr(heading)
 		self.vertStr = vertStr
-		self.vsStr = "Airborne"
+		self.fsStr = "Airborne"
 		self.timestamp = time.time()
 		self.vel_timestamp = self.timestamp = time.time()
 
@@ -206,7 +203,7 @@ class Aircraft(QObject):
 			self.riStr = riStr
 		if acasStr != "":
 			self.acasStr = acasStr
-		self.vsStr = vsStr
+		self.fsStr = vsStr
 		self.timestamp = time.time()
 
 	def setCommBAltitude(self, alt, iis, fsStr, drStr):
@@ -246,7 +243,7 @@ class Aircraft(QObject):
 			for tp in self.track:
 				track_meters += [(tp[0], tp[1], feet2meters(tp[2]))]
 			desc = (self.countryStr)
-			# fixme - to description add: max speed, min speed, max alt, min alt, country, category, ID str, registration info, vsStr, squawk, range
+			# fixme - to description add: max speed, min speed, max alt, min alt, country, category, ID str, registration info, fsStr, squawk, range
 			# fixme - add TimeSpan, TimeStamp
 			# fixme - add Schema for custom parameters to be displayed in elevation plot
 			# fixme - sort this dump by AA or ID
@@ -281,7 +278,7 @@ class Aircraft(QObject):
 		#kml.save("adsb.kml")
 		age = time.time() - self.timestamp
 		print "age %3u: %14s %x: %s, %s, Range: %2u km, Pos: %s (+/- %s), Alt: %6d (%s), %s, Heading: %3u, Speed: %s, Squawk: %4u, %s %s" % \
-			(age, self.countryStr, self.aa, self.idStr, self.vsStr, self.range, self.posStr, self.posUncertStr, self.alt, \
+			(age, self.countryStr, self.aa, self.idStr, self.fsStr, self.range, self.posStr, self.posUncertStr, self.alt, \
 			self.altTypeStr, self.vertStr, self.heading, self.velStr, self.squawk, self.catStr, self.caStr)
 
 		

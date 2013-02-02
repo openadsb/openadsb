@@ -34,7 +34,7 @@ class AircraftDbInfo():
 		
 	def dump(self):
 		print "---------------"
-		print "N-%s has ICAO24%X"%(self.registrationStr, self.aa)
+		print "N-%s has ICAO24 addr %X"%(self.registrationStr, self.aa)
 		print "%s %s %s, %u seats" % (self.yearBuilt, self.acMfgStr, self.acModelStr, self.numSeats)
 		print "%u engines, %s %s" % (self.numEng, self.engTypeStr, self.engPowerStr)
 		print "%s, %s, %s %s" % (self.ownerStr, self.ownerCityStr, self.ownerStateStr, self.ownerCountryStr)
@@ -46,11 +46,8 @@ class AircraftDb(QObject):
 		self.db = QSqlDatabase.addDatabase("QMYSQL")
 		self.db.setHostName("db1.openadsb.com")
 		self.db.setDatabaseName("openadsb1")
-		self.db.setUserName("openadsb1user")
-		self.db.setPassword("Password#1")
-
-	#def result(self):
-		#pass
+		self.db.setUserName("openadsb1user")		# read-only login
+		self.db.setPassword("Password#1")		# highly secure password ;)
 
 	def connectDb(self):
 		if self.db.isOpen():
@@ -88,10 +85,11 @@ class AircraftDb(QObject):
 		self.connectDb()
 		query = QSqlQuery()
 		query.setForwardOnly(True)
-		qstr = "SELECT MFR, MODEL, TYPE, HORSEPOWER, THRUST FROM faa_engine WHERE CODE = %s" % (code)
+		qstr = "SELECT MFR, MODEL, TYPE, HORSEPOWER, THRUST FROM faa_engine WHERE CODE = '%s'" % (code)
 		query.exec_(qstr)
 		if query.lastError().isValid():
 			print "Database error: %s, %s" % (query.lastError().databaseText(), query.lastError().driverText())
+			print "Query was: '%s'" % (qstr)
 
 		while (query.next()):
 			mfg = query.value(0).toString().trimmed();

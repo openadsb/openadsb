@@ -1,4 +1,4 @@
-# Top-level module for ADSB decoder
+# Top-level module for OpenADSB app
 # B. Kuschak, OpenADSB Project <brian@openadsb.com>
 #
 import sys
@@ -8,16 +8,20 @@ import decoder
 import tablewidget
 #import webserver
 import signal
+import dlg_sharing
 import dlg_server
 import dlg_origin
+import client
 import server
+import server_new
 import db
 import gmaps
 import gearth
+import settings
+import flightradar24
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 from PyQt4.QtWebKit import *
-#from PyQt4 import QtGui 
 import yappi
 
 # Qt main window for the GUI
@@ -26,7 +30,10 @@ class MainWindow(QMainWindow):
 		QMainWindow.__init__(self)
 		self.reader = reader
 		self.server = None
+		self.client = None
 		self.args = args
+		self.settings = settings.globalSettings(self)
+		self.settings.save()
 		self.initUI()
 
 	def initUI(self):
@@ -51,10 +58,11 @@ class MainWindow(QMainWindow):
 		wikiAction.setShortcut('Ctrl+W')
 		wikiAction.setStatusTip('Open the Wiki webpage')
 		wikiAction.triggered.connect(self.openWiki)
-		serverAction = QAction(QIcon(), 'Streaming Server...', self)
+		serverAction = QAction(QIcon(), 'Data Sharing...', self)
 		serverAction.setShortcut('Ctrl+S')
-		serverAction.setStatusTip('Run a streaming server for other clients')
-		serverAction.triggered.connect(self.cfgServer)
+		serverAction.setStatusTip('Run a client or server to connect to others')
+		#serverAction.triggered.connect(self.cfgServer)
+		serverAction.triggered.connect(self.cfgSharing)
 		originAction = QAction(QIcon(), 'Set Origin ...', self)
 		originAction.setShortcut('Ctrl+O')
 		originAction.setStatusTip('Set the position of your antenna, so position decoding works')
@@ -93,10 +101,10 @@ class MainWindow(QMainWindow):
 		self.t.connect(self.dec, SIGNAL("delAircraft()"), self.t.delAircraft)
 		
 		# Create a progress bar to show the current RX level
-		self.rxbar = QProgressBar()
-		self.rxbar.setRange(0, 4096)
-		self.rxbar.setValue(50)
-		self.rxbar.show()
+		#self.rxbar = QProgressBar()
+		#self.rxbar.setRange(0, 4096)
+		#self.rxbar.setValue(50)
+		#self.rxbar.show()
 		#self.rxbar.connect(self.dec, SIGNAL("rxLevelChanged(int)"), self.rxbar.setValue)
 
 		self.daclevel = QSpinBox()
@@ -230,7 +238,7 @@ class MainWindow(QMainWindow):
 		vsplit = QSplitter()
 		vsplit.setOrientation(Qt.Vertical)
 		vsplit.addWidget(self.t)
-		vsplit.addWidget(self.rxbar)
+		#vsplit.addWidget(self.rxbar)
 		#vsplit.addWidget(statsWindow)
 		#vsplit.addWidget(statsWebBox)
 		vsplit.addWidget(hsplit)
@@ -250,6 +258,11 @@ class MainWindow(QMainWindow):
 		self.connect(self.dec, SIGNAL("addAircraft(PyQt_PyObject)"), self.dbThread.db.addAircraft)
 		self.connect(self.dbThread.db, SIGNAL("updateAircraftDbInfo(PyQt_PyObject)"), self.t.updateAircraftDbInfo)
 
+		# Create thread to query flightradar24.com
+		self.fr24Thread = flightradar24.fr24Thread()
+		self.connect(self.dec, SIGNAL("addAircraft(PyQt_PyObject)"), self.fr24Thread.addAircraft)
+		self.connect(self.fr24Thread, SIGNAL("updateAircraftFR24Info(PyQt_PyObject)"), self.t.updateAircraftFR24Info)
+
 		# control DAC automatically
 		if self.args.ditherdac:
 			self.ditherdac = DitherDAC(self)
@@ -258,6 +271,51 @@ class MainWindow(QMainWindow):
 		# open in browser
 		OPENADSB_WIKI_URL = "http://www.openadsb.com/wiki"
 		QDesktopServices.openUrl(QUrl(OPENADSB_WIKI_URL, QUrl.TolerantMode))
+
+	# bk - make new one - using server_new and client
+	def cfgSharing(self):
+		# FIXME - read these defaults from our application settings
+		args = dict()
+		args['enableClient'] = True
+		args['enableServer'] = True
+		args['client'] = "1.2.3.4"
+		args['clientPort'] = 57575
+		args['serverPort'] = 56565
+		args['maxConn'] = 5
+		args['formats'] = ["PlanePlotter", "AVR", "OpenADSB v1 ASCII"]
+		args['clientFormat'] = args['formats'][2]
+		args['serverFormat'] = args['formats'][0]
+		(accepted, args) = dlg_sharing.DlgConfigSharing.get(args)
+		#(accepted, s) = dlg_sharing.DlgConfigSharing.get(self.settings.sharing)
+		if accepted:
+			if self.server != None:
+				self.server.shutdown()
+				self.server = None
+			if args['enableServer']:
+				#self.server = server_new.ServerThread('', s.serverPort, s.maxConn, s.serverFormat)
+				self.server = server_new.ServerThread('', args['serverPort'], args['maxConn'], args['serverFormat'])
+				self.server.start()
+				print "started server thread(s) on port %d" % (args['serverPort'])
+			self.reader.setServer(self.server)
+
+			if self.client != None:
+				self.client.shutdown()
+				self.client.join()
+				self.client = None
+
+			if args['enableClient']:
+				self.client = client.ClientThread(args['client'], args['clientPort'])
+				self.client.start()
+				print "started client thread(s) for %s port %d" % (args['client'], args['clientPort'])
+				# fixme - need to instantiate a new reader
+				a = {}
+				a.host = args['client']
+				a.port = args['clientPort']
+				r = reader.AdsbReaderThreadSocket(a)
+
+			#self.settings.sharing = s
+			#self.settings.save()
+			
 
 	# bk - make new one - using server_new and client
 	def cfgServer(self, enable, port, maxConn, fmt):
@@ -320,12 +378,12 @@ class DitherDAC(QObject):
 
 	def dacupdate(self):
 		# called periodically by timer
-		high = 3000
+		#high = 3000
+		high = 4095
 		low = 1200
 		r = qrand() % ((high+1) - low) + low
 		self.mainWindow.daclevel.setValue(r)
 
-		
 #def signalHandler(signal, frame):
 	#print "Ctrl+C received... shutting down"
 	
@@ -352,7 +410,7 @@ def main():
 	parser.add_argument('-v', '--verbose', dest="verbose", metavar="LEVEL", help="increasing output levels 1 to 5")
 	parser.add_argument('-H', '--host', dest="host", help="read packets from ipaddr:port")
 	parser.add_argument('-S', '--server', dest="server", metavar="PORT", help="start a packet server on this host on port PORT")
-	parser.add_argument('-d', '--dac', dest="daclevel", metavar="VALUE", help="set the DAC level to VALUE (0 to 4096?)", default=default_daclevel)
+	parser.add_argument('-d', '--dac', dest="daclevel", metavar="VALUE", help="set the DAC level to VALUE (0 to 4096?)", type=int, default=default_daclevel)
 	parser.add_argument('-D', '--dither', dest="ditherdac", help="automatically control DAC value", action='store_true' )
 	parser.add_argument('-O', '--origin', dest="origin", nargs=2, metavar="FLOAT",  help="Latitude and Longitude of Origin in degrees (-90 to 90, -180 to 180)", default=default_origin)
 	#parser.add_argument('-o', '--output', dest='output', metavar="FILE", help="log packets to FILE")

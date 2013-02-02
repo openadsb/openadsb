@@ -20,7 +20,7 @@ import sys
 class SocketHandler(SocketServer.BaseRequestHandler):
     def setup(self):
         print self.client_address, 'connected!'
-        self.request.send('hi ' + str(self.client_address) + '\n')
+        self.request.send('HELLO ' + str(self.client_address) + '\n')
 
 	self.outgoing_q = Queue.Queue(maxsize=100)		# max 100 items
 	self.server.myThread.addClientQueue(self.outgoing_q)

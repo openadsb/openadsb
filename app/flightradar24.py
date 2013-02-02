@@ -1,4 +1,6 @@
 # try to use the data stream from flightradar24.com
+# B. Kuschak, OpenADSB Project <brian@openadsb.com>
+#
 # parts of this borrowed from https://www.assembla.com/code/saintamh/subversion/nodes/azimuth/py/flightradar24.py?rev=2304
 
 # we can import the following when we don't have them from ADSB: flightnum, actype, acreg, radar, origin, dest, if the ts is within some small number
@@ -10,14 +12,30 @@ import urlparse
 import mmap
 import httplib
 import time, os, stat
+import csv
+from PyQt4.QtCore import *
 
-def file_age_in_seconds(pathname):
-    try:
-	ftime = os.stat(pathname)[stat.ST_MTIME]
-    except:
-	return 1e9	# hack
-    return time.time() - ftime
+# class for converting IATA airport codes
+#  Using data file from http://www.codediesel.com/data/international-airport-codes-download/
+#  by Sameer Borate, metapix[at]gmail.com
+class airportCodes():
+	def __init__(self):
+		self.codes = dict()
+		with open('airport-codes.csv', 'r') as csvfile:
+			self.reader = csv.reader(csvfile)
+			for row in self.reader:
+				(airport, code) = row
+				self.codes[code.upper().strip()] = airport.strip()
 
+	def lookup(self, code):
+		if code == '':
+			return ''
+		try:
+			return self.codes[code.upper()]
+		except:
+			return ''
+
+# class representing one flight
 class flight():
 	def __init__(self):
 		self.callsign = ""
@@ -35,24 +53,35 @@ class flight():
 		self.origin = ""
 		self.destination = ""
 		self.flightnum = ""
+		self.originVerbose = "?"
+		self.destinationVerbose = "?"
 
 	def printInfo(self):
 		age = time.time() - int(self.ts)
-		print "Callsign: %s, ICAO24 %s, lat = %s, lon = %s, heading = %s, alt = %s, speed = %s, radar = %s, feed = %s, actype = %s, acreg = %s, ts = %s, age = %d, flightnum = %s, from %s to %s" %  \
-			(self.callsign, self.aa, self.lat, self.lon, self.heading, self.alt_f, self.speed_kts, self.radar, self.feed, self.actype, self.acreg, self.ts, age, self.flightnum, self.origin, self.destination)
+		print "Callsign: %s, ICAO24 %s, lat = %s, lon = %s, heading = %s, alt = %s, speed = %s, radar = %s, feed = %s, actype = %s, acreg = %s, ts = %s, age = %d, flightnum = %s, from %s (%s) to %s (%s)" %  \
+			(self.callsign, self.aa, self.lat, self.lon, self.heading, self.alt_f, self.speed_kts, self.radar, self.feed, self.actype, self.acreg, self.ts, age, self.flightnum, self.origin, self.originVerbose, self.destination, self.destinationVerbose)
 
-class fr24():
+# interface to flightradar24.com
+class fr24(QObject):
 	def __init__(self):
 		self.flights = dict()
 		self.filename = 'full_all.json'
+		self.airports = airportCodes()
+		self.dumpFilename = 'fr24reg_dump.txt'
 		
 	def lookupFlight(self, aa):
 		try:
 			f = self.flights[aa]
-			print "Found a flight matching AA = ",aa
-			f.printInfo()
+			#print "Found a flight matching AA = ",aa
+			if f.origin != '':
+				f.originVerbose = self.airports.lookup(f.origin)
+			if f.destination != '':
+				f.destinationVerbose = self.airports.lookup(f.destination)
+			#f.printInfo()
+			return f
 		except:
-			print "Did not find flight with AA = ", aa
+			#print "FR24: Did not find flight with AA = ", aa
+			return None
 
 	def getfile(self):
 		h = httplib.HTTPConnection('www.flightradar24.com')
@@ -65,35 +94,10 @@ class fr24():
 		f.close()
 
 	def decode(self):
-		#str = '{"CFG225":["3C4AA6",36.9538,-31.8911,"55","35025","525","0000","T-LPPI1","B763","D-ABUF",1357360142,"FUE","PAD","DE6225","0","0"]}'
-		#j = json.loads(str)
-		#print j
-
 		# read from file
 		jsonfile = open('full_all.json', 'r')
-		#str = jsonfile.readlines()
-		#str = jsonfile.read()
 		map = mmap.mmap(jsonfile.fileno(), 0, mmap.MAP_PRIVATE)
 		str = map[0:]
-		#print str
-
-		#http = SimpleHTTPClient (
-			#cache_path = here (__file__, '..', 'cache', 'flightradar24'),
-			#cache_requests = True,
-			#courtesy_delay = 5,
-		#)
-#
-		#fetch_html = html_fetcher (
-			#http,
-			#encoding = 'UTF-8',
-		#)
-
-		#json_struct = json.loads (
-			#http.simple_post (
-				#'http://www.flightradar24.com/PlaybackFlightsService.php',
-				#'date=%s' % urllib.quote_plus (dt.strftime ('%Y-%m-%d %H:%M:%S')),
-			#)
-		#)
 		json_struct = json.loads(str)
 
 		# "UAE747": [    // "callsign": ICAO (not IATA!) ID, plus flight number
@@ -110,11 +114,11 @@ class fr24():
 		#     1327921638 // 10: looks like a timestamp
 		#     ],
 
-		# reuse structs to save memory
-		#planes_by_callsign = {}	
-		
+		# fixme - add mutex here so other threads don't lookup while building new index
+
 		lines = 0
 		success = 0
+		self.flights = {}
 		for callsign, s in json_struct.iteritems():
 			lines += 1
 			try:
@@ -137,18 +141,77 @@ class fr24():
 				self.flights[f.aa] = f
 				success += 1
 
-				#f.printInfo()
-
-				#print "%d, Callsign: %s, ICAO24 %s, lat = %s, lon = %s, heading = %s, alt = %s, speed = %s, radar = %s, actype = %s, acreg = %s, ts = %s" % (lines, callsign, aa, lat, lon, heading, alt_f, speed_kts, radar, actype, acreg, ts)
 			except:
 				pass
 
 		print "processed %d lines, %d failures" % (lines, lines-success)
 		return
 
+	# dump a list of ICAO24 codes, tail number, equipment type, and callsign to file 
+	# for later scraping
+	def dumpRegInfo(self):
+		f = open(self.dumpFilename, "w") 
+		for aa in self.flights.keys():
+			fl = self.flights[aa]
+			str = '%s, %s, %s, %s\n' % (fl.aa, fl.acreg, fl.actype, fl.callsign)
+			f.write(str)
+		f.close()
+
+	@staticmethod
+	def file_age_in_seconds(pathname):
+		try:
+			ftime = os.stat(pathname)[stat.ST_MTIME]
+		except:
+			return 1e9	# hack
+		return time.time() - ftime
+
+# long-running thread to handle lookups
+class fr24Thread(QThread):
+	def __init__(self):
+		QThread.__init__(self)
+		self.setObjectName("FR24 Thread")
+		self.fr24 = None
+		#self.fr24 = fr24()
+		# This object exists in caller's thread context.  Move it to our thread content so signal/slots work
+		#self.fr24.moveToThread(self)	
+		self.start()
+
+	def updateIfNecessary(self):
+		# download new file if older than 10 minutes
+		age = self.fr24.file_age_in_seconds(self.fr24.filename)
+		if age > 600:
+			print "FR24 data file is old (%f minutes).  Retrieving new one" % (age/60.0)
+			self.fr24.getfile()
+		#else:
+			#print "data file is new enough (%f seconds)." % age
+
+	def run(self):
+		self.fr24 = fr24()
+		self.updateIfNecessary()
+		self.fr24.decode()
+		self.exec_()				# run the event loop
+		print "FR24 thread exiting"
+	
+	def shutdown(self):
+		print "shutting down FR24 thread"
+
+	# slot which listens for new aircraft being detected
+	# perform lookup and emit signal with database info
+	def addAircraft(self, ac):
+		aa = "%X" % ac.aa
+		#print "FR24 addAircraft: aa =", aa
+		# fixme - call updateIfNecessary and decode()
+		if self.fr24 == None:
+			return
+
+		f = self.fr24.lookupFlight(aa)
+		if f != None:
+			self.emit(SIGNAL("updateAircraftFR24Info(PyQt_PyObject)"), f)
+
+
 if __name__ == '__main__':
 	f = fr24()
-	age = file_age_in_seconds(f.filename)
+	age = f.file_age_in_seconds(f.filename)
 	print type(age)
 	if age > 600:
 		print "data file is old (%f minutes).  Retrieving new one" % (age/60.0)
@@ -156,6 +219,9 @@ if __name__ == '__main__':
 	else:
 		print "data file is new enough (%f seconds)." % age
 	f.decode()
+	f.dumpRegInfo()
 	if len(sys.argv) == 2:
-		f.lookupFlight(sys.argv[1])
+		fl = f.lookupFlight(sys.argv[1])
+		if fl != None:
+			fl.printInfo()
 

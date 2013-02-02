@@ -250,7 +250,7 @@ class AdsbReaderThreadUSB(AdsbReaderThread):
 			self.bad_long_pkts += int(d[5])
 			d = d[8:]
 			self.logPacket(d)
-			self.dumpPacket(d)
+			#self.dumpPacket(d)
 			self.servePacket(d)
 			self.decoder.decode(d)
 			self.decoder.updateStats(rxlevel, self.bad_short_pkts, self.bad_long_pkts, self.logfileSize())
@@ -316,6 +316,6 @@ class AdsbReaderThreadUSB(AdsbReaderThread):
 	return self.dev.ctrl_transfer(usb.util.CTRL_IN | usb.util.CTRL_TYPE_VENDOR, 0xbb, 0, 0, 64)
 
     def setDAC(self, v):
-	print "setDAC to %d" % (v)
+	#print "setDAC to %d" % (v)
 	return self.dev.ctrl_transfer(usb.util.CTRL_IN | usb.util.CTRL_TYPE_VENDOR, 0xda, v&0xFFFF, 0, 64)
 
