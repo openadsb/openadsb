@@ -8,6 +8,7 @@ import socket
 import time, math
 import binascii
 import argparse
+import Queue
 #import threading
 from PyQt4.QtCore import *
 import decoder
@@ -63,6 +64,7 @@ class AdsbReaderThread(QThread):
     def servePacket(self, d):
 	# fixme - handle race condition when starting/stopping?
 	if(self.server != None):
+		d = bytearray(d)		# FIXME - bk this should be a byte array before this call...
 		# for now convert this to a string - should probably be done in the server, since it will vary with format
 		ts = time.time()
 		str = ""
@@ -140,10 +142,6 @@ class AdsbReaderThreadSocket(AdsbReaderThread):
     def __init__(self, args):
 	AdsbReaderThread.__init__(self, args)
 
-    def __del__(self):
-	pass
-	#AdsbReaderThread.__del__(self)
-
     def read(self):
 	ls = 0
 	pktCnt = 0
@@ -181,31 +179,75 @@ class AdsbReaderThreadSocket(AdsbReaderThread):
 	return b
 
 
+# We want to read from the USB port at the highest possible rate, to avoid stalling the receiver. 
+# Spawn a high-priority thread to actually read from the port, and enqueue the packets for processing
+class UsbServiceThread(QThread):
+	def __init__(self, readerThread):
+		QThread.__init__(self)
+		self.readerThread = readerThread
+		self.q = Queue.Queue(maxsize=10)
+		self.kill_received = False
+
+	def run(self):
+		self.setPriority(QThread.HighPriority)
+		pktCnt = 0
+		starttime = time.time()
+		while not self.kill_received:
+			try:
+				d = self.readerThread.dev.read(0x81, 64, 0, 10000)
+			except:
+				# device might have been removed
+				# terminate thread
+				break
+
+			#if pktCnt % 10 == 0:
+				#print "USB read: ", time.time(), len(d), "bytes", pktCnt/(time.time()-starttime), "pkts/sec"
+
+			if len(d) > 0:
+				pktCnt = pktCnt + 1
+				try:
+					self.q.put_nowait(d)
+					#if self.q.qsize() > 1:
+						#print "USB read: queue size: ", self.q.qsize()
+				except: 
+					print "USB service thread: queue full, dropping pkt!"
+
+		# flush the queue on exit
+		while not self.q.empty():
+			self.q.get()
+			self.q.task_done()
+
+		print "USB service thread exiting"	# FIXME - deal with q deletion underneath reader thread...
+
+	def get(self):
+		return self.q.get()	# blocking read
+
+	def _free(self):
+		self.q.task_done()	# done with last data from last get()
+
+
 # This class interfaces to the ADSB USB dongle
 class AdsbReaderThreadUSB(AdsbReaderThread):
 
     def __init__(self, args):
 	AdsbReaderThread.__init__(self, args)
-
-    #def __del__(self):
-	#pass
-
+	self.usbThread = UsbServiceThread(self)		# use another thread to keep servicing port at high rate
+ 
     def read(self):
 	ls = 0
 	pktCnt = 0
+	starttime = time.time()
 	while not self.kill_received:
-		#try:
-			#d = self.dev.read(0x81, 64, 0, 100)
-		d = self.dev.read(0x81, 64, 0, 10000)
-		#except:							# use a 5-second timer to age aircraft?
-			#break
+
+		d = self.usbThread.get()		# get packet from queue
 
 		if len(d) > 0:
+			pktCnt = pktCnt + 1
+
 			rxlevel = (d[0]<<8) | d[1]
 			daclevel = (d[2]<<8) | d[3]
 			self.bad_short_pkts += int(d[4])
 			self.bad_long_pkts += int(d[5])
-			#print "rxlevel=%u, dac=%u, bad_short_pkts=%u, bad_long_pkts=%u" % (rxlevel, daclevel, self.bad_short_pkts, self.bad_long_pkts)
 			d = d[8:]
 			self.logPacket(d)
 			self.dumpPacket(d)
@@ -214,15 +256,15 @@ class AdsbReaderThreadUSB(AdsbReaderThread):
 			self.decoder.updateStats(rxlevel, self.bad_short_pkts, self.bad_long_pkts, self.logfileSize())
 		ls += len(d)
 
+		self.usbThread._free()			# discard memory used by packet
+
     def run(self):
 	yappi.start()
 	print "Logging received packets to file %s" % (packetlog_fname)
 	self.PACKETLOG = open(packetlog_fname, "a")		# append to log
 
-	# Open the USB device
+	# Open the USB device. deal with multiple devices.  pick the first available
 	print "Opening USB device..."
-	#self.dev = usb.core.find(idVendor=0x9999, idProduct=0xffff)
-	# deal with multiple devices.  pick the first available
 	dev_list = usb.core.find(idVendor=0x9999, idProduct=0xffff, find_all=True)
 	print dev_list
 	for self.dev in dev_list:
@@ -247,9 +289,16 @@ class AdsbReaderThreadUSB(AdsbReaderThread):
 		self.setDAC(self.args.daclevel)
 
 	print "Reading packets from USB device..."
+	self.usbThread.start()
+
 	# Don't return until the USB device is removed.
 	b = self.read()
 	print "read returned ",b
+
+	# kill USB service thread
+	self.usbThread.kill_received = True
+	self.usbThread.join()
+
 	#yappi.print_stats(sys.stdout, yappi.SORTTYPE_TTOTAL)
 	yappi.print_stats()
 	#return b
