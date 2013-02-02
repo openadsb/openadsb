@@ -147,11 +147,11 @@ class TableHighlighter(QObject):
 
     @pyqtSlot(str)
     def highlight(self, aa):
-        print "will highlight table id ", aa
+        #print "will highlight table id ", aa
 	self.parent.emit(SIGNAL("highlightAircraft(int)"), int(aa))
 
     @pyqtSlot(str)
     def unhighlight(self, aa):
-        print "will unhighlight table id ", aa
+        #print "will unhighlight table id ", aa
 	self.parent.emit(SIGNAL("unhighlightAircraft(int)"), int(aa))
 
