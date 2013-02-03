@@ -31,6 +31,7 @@ class DecoderStats:
 		self.DF5 = 0
 		self.DF11 = 0
 		self.DF17 = 0
+		self.DF18 = 0
 		self.DF20 = 0
 		self.DF21 = 0
 		self.DFOther = 0
@@ -60,6 +61,7 @@ class AdsbDecoder(QObject):
 			#del self.recentAircraft[aa]
 
 		
+
 	# Some statistics are maintained by the decoder, but are gleaned from the reader or elsewhere
 	def updateStats(self, rxLevel, badShort, badLong, logfilesize):
 		self.stats.logfileSize = int(logfilesize)
@@ -98,6 +100,9 @@ class AdsbDecoder(QObject):
 		elif df == 17:
 			self.DecodeDF17(b)
 			self.stats.DF17 += 1
+		elif df == 18:
+			self.DecodeDF18(b)
+			self.stats.DF18 += 1
 		elif df == 20:
 			self.DecodeDF20(b)
 			self.stats.DF20 += 1
@@ -105,9 +110,14 @@ class AdsbDecoder(QObject):
 			self.DecodeDF21(b)
 			self.stats.DF21 += 1
 		else:
-			print "  Need decoder for DF %u" % (df)
+			print "  Need decoder for DF %u: " % (df), self.ba2hex(d)
 			self.stats.DFOther += 1
 	
+	def ba2hex(self, d):
+		mystr = ""
+		for byte in d:
+			mystr += "%02hx " % byte
+		return mystr
 
 	def capabilitiesStr(self, ca):
 		if ca == 0:
@@ -385,6 +395,313 @@ class AdsbDecoder(QObject):
 			crcgood = False
 
 		posUncertStr = ""
+
+		tcSstr = self.typeCodeStrDF17_18(tc)
+
+		if len(pkt) < 112:
+			print "short DF17 pkt"
+			return
+
+		if tc >= 1 and tc <=4:
+			# Aircraft Identification String BDS0,8
+			cat = me[5:8].uint
+			# fixme - these decode differently for TC1,2,3
+			catStr = ""
+			if cat == 0:
+				catStr = "A/C category unavailable"
+			elif cat == 1:
+				catStr = "Light weight <15K pounds"
+			elif cat == 2:
+				catStr = "Medium weight <75K pounds"
+			elif cat == 3:
+				catStr = "Medium weight <300K pounds"
+			elif cat == 4:
+				catStr = "Strong vortex aircraft"
+			elif cat == 5:
+				catStr = "Heavy weight >300K pounds"
+			elif cat == 6:
+				catStr = "High performance, high speed"
+			elif cat == 7:
+				catStr = "Rotorcraft"
+			else:
+				catStr = "Category %u" % (cat)
+			id = self.decodeChars(me[8:56])
+			if crcgood:
+				a = self.lookupAircraft(aa)
+				if a == None:
+					a = self.recordAircraft(aa)
+				a.setIdentityInfo(id, catStr)
+				#print "  Aircraft identifier: %s, %s" % (id, catStr)
+				self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
+			
+		elif tc >=5 and tc <=8:
+			# Surface position BDS0,6
+			movement = me[5:12].uint
+			gtv = me[12:13].uint
+			track = me[13:20].uint
+			timesync = me[20:21].uint
+			oddeven = me[21:22].uint
+			cprlat = me[22:39].uint
+			cprlong = me[39:56].uint
+			[lat, lon] = self.decodeCPR(cprlong, cprlat, 17, 90, oddeven)
+			posStr = " at (%f, %f)" % (lat, lon)
+			moveStr = self.decodeMovement(movement)
+			#print "  DF17: %hx %hx tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u mvmt=%u (%s), pos %s:" % (ca, aa, tc, oddeven, timesync, cprlat, cprlong, movement, moveStr, posStr)
+			self.logMsg("  DF17: %hx %hx tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u mvmt=%u (%s)" % (ca, aa, tc, oddeven, timesync, cprlat, cprlong, movement, moveStr))
+			if crcgood:
+				# store aa, ONGROUND, posStr, moveStr
+				a = self.lookupAircraft(aa)
+				if a == None:
+					a = self.recordAircraft(aa)
+				a.setGroundPos(posStr, moveStr, caStr)
+				self.emit(SIGNAL("updateAircraftPosition(PyQt_PyObject)"), a)
+				# FIXME - emit updateAircraftPosition also
+			
+		elif tc >=9 and tc <=22 and tc != 19:	
+			# Airborne position BDS0,5
+			ss = me[5:7].uint		# fime decode per (A.2.3.2.6)
+			ant = me[7:8].uint		# fixme (A.2.3.2.5)
+			ac = me[8:20]
+			#print len(me[8:15]), len(me[15:20]), len(ac)
+			if tc >= 20 and tc <= 22:
+				alt = ac.uint				# GPS HAE (fixme - units?)
+				altStr = "%d units?" % (alt)
+				altTypeStr =  "GPS HAE"
+			else:
+				# m bit is omitted, add it back
+				ac = ac[0:6] + bitstring.BitArray(bin='0') + ac[6:12] 	
+				[alt, altStr] = self.AltitudeCode(ac)	# barometric
+				altTypeStr =  "barometric"
+			timesync = me[20:21].uint
+			oddeven = me[21:22].uint
+			cprlat = me[22:39].uint
+			cprlong = me[39:56].uint
+			self.logMsg("  DF17: %hx %hx %s tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u" % (ca, aa, altStr, tc, oddeven, timesync, cprlat, cprlong))
+			[lat, lon] = self.decodeCPR(cprlong, cprlat, 17, 360, oddeven)
+			posStr = " at (%f, %f)" % (lat, lon)
+			#print "  DF17: %hx %hx %s tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u, pos %s" % (ca, aa, altStr, tc, oddeven, timesync, cprlat, cprlong, posStr)
+			#print pkt, crcgood
+			if crcgood:
+				# store aa, AIRBORNE, posStr, altStr, posUncertStr, altTypeStr
+				a = self.lookupAircraft(aa)
+				if a == None:
+					a = self.recordAircraft(aa)
+				a.setAirbornePos(lat, lon, alt, posUncertStr, altTypeStr, caStr)
+				self.emit(SIGNAL("updateAircraftPosition(PyQt_PyObject)"), a)
+				# FIXME - emit updateAircraftPosition also
+
+		elif tc == 19:
+			# Airborne velocity BDS0,9
+			st1 = me[5:8].uint
+			st2 = me[8:11].uint
+			icf = me[8:9].uint
+			ifr = me[9:10].uint
+			nuc = me[10:13].uint
+			west = me[13:14]
+			vel_ew = me[14:24].uint - 1
+			south = me[24:25]
+			vel_ns = me[25:35].uint - 1
+			baro = me[35:36]
+			down = me[36:37]
+			vrate = me[37:46].uint
+
+			if st1 == 2 or st1 == 4:
+				vel_ew *= 4
+				vel_ns *= 4
+			if west:
+				vel_ew *= -1
+			if south: 
+				vel_ns *= -1
+
+			vel = math.sqrt(math.pow(vel_ew, 2) + math.pow(vel_ns, 2))
+			heading = math.atan2(vel_ew, vel_ns) / math.pi * 180
+			if heading < 0:
+				heading += 360
+
+			if vel == 0:
+				velStr = "Speed unavailable"
+			elif st1 == 1 or st1 == 2:
+				velStr = "Ground speed %u kts" % vel
+			elif st1 == 3 or st1 == 4:
+				velStr = "Airspeed %u kts" % vel
+			else:
+				velStr = "Reserved"
+			
+			if vrate == 0:
+				vertStr = "Vertical rate unavailable"
+			else:	
+				if down:
+					vrate *= -1;
+				vertStr = "%d ft/min" % (vrate*64)
+				if baro:
+					vertStr += " (barometric)"
+				else:
+					vertStr += " (GPS)"
+
+			#print "%u %u %u Heading %d deg. %s. %s." % (icf, ifr, nuc, heading, velStr, vertStr)
+			if crcgood:
+				# store aa, velStr, heading, vertStr
+				a = self.lookupAircraft(aa)
+				if a == None:
+					a = self.recordAircraft(aa)
+				a.setAirborneVel(velStr, heading, vertStr, caStr)
+				self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
+
+		else:
+			print "need decoder for DF%u, type %u:" % (df, tc), self.ba2hex(pkt)
+
+		if aa == 0x555555:
+			aaStr = "Anonymous"
+		else:
+			aaStr = "%hx" % (aa)
+			
+		if crcgood:
+			# CRC good 
+			errStr = ""
+			self.stats.goodPkts += 1
+		else:
+			errStr = "CRC error (expected %x, rx %x)." % (crc.uint, pi.uint)
+			self.stats.CrcErrs += 1
+		#print "  DF%u (Extended Squitter): Aircraft ID %s%s. %s %s" % (df, aaStr, posStr, tcStr, errStr)
+		self.logMsg("  DF%u (Extended Squitter): Aircraft ID %s%s. %s %s" % (df, aaStr, posStr, tcStr, errStr))
+		# fixme - print velStr, vertStr here...
+
+
+	def DecodeDF18(self, pkt):
+		# 112-bit packet
+		df = pkt[0:5].uint
+		cf = pkt[5:8].uint
+		aa = pkt[8:32].uint
+		me = pkt[32:88]
+		pi = pkt[88:112]
+		tc = me[0:5].uint	# type code - same as DF17?
+
+		aaStr = "%hx" % (aa)
+		crc = self.calcParity(pkt[0:88])
+		if crc == pi:
+			crcgood = True
+		else:
+			crcgood = False
+	
+		tcStr = self.typeCodeStrDF17_18(tc)
+
+		#print " DF%u (TIS-B): Aircraft ID %s. CF=%u, TC=%u %s" % (df, aaStr, cf, tc, tcStr)
+
+		#if tc >=9 and tc <=22 and tc != 19:	
+		if tc == 13:
+			# TIS-B Fine Airborne Position 
+			ss = me[5:7].uint
+			imf = me[7:8].uint	# ICAO/Mode A flag
+			if ss == 1:
+				ssStr = "Emergency Alert"
+			elif ss == 2:
+				ssStr = "Temporary Alert"
+			elif ss == 3:
+				ssStr = "SPI condition"
+			else:
+				ssStr = ""
+			ac = me[8:20]
+			oddeven = me[21:22].uint
+			# m bit is omitted, add it back
+			ac = ac[0:6] + bitstring.BitArray(bin='0') + ac[6:12] 	
+			[alt, altStr] = self.AltitudeCode(ac)	# barometric
+			altTypeStr =  "barometric"
+			cprlat = me[22:39].uint
+			cprlong = me[39:56].uint
+			[lat, lon] = self.decodeCPR(cprlong, cprlat, 17, 360, oddeven)
+			posStr = " at (%f, %f)" % (lat, lon)
+
+			if crcgood:
+				# store aa, AIRBORNE, posStr, altStr, posUncertStr, altTypeStr
+				# FIXME - if CF == 5, then the AA is fake (unique, but not ICAO registered)
+				a = self.lookupAircraft(aa)
+				if a == None:
+					a = self.recordAircraft(aa)
+				a.setAirbornePos(lat, lon, alt, "", altTypeStr, "")
+				self.emit(SIGNAL("updateAircraftPosition(PyQt_PyObject)"), a)
+
+			self.logMsg(" DF%u (TIS-B): Aircraft ID %s. CF=%u, IMF=%u, TC=%u, SS=%u %s, %s %s, odd=%u, %s" % \
+				(df, aaStr, cf, imf, tc, ss, ssStr, altStr, altTypeStr, oddeven, posStr))
+		elif tc == 19:
+			# TIS-B Velocity 
+			subtype = me[5:8].uint
+			imf = me[8:9].uint	# ICAO/Mode A flag
+			nacp = me[9:13].uint
+			geo = me[35:36]
+			down = me[36:37]
+			vrate = me[37:46].uint
+			nic = me[47:48]
+
+			if subtype == 1 or subtype == 2:
+				# ground referenced velocity
+				west = me[13:14]
+				vel_ew = me[14:24].uint - 1
+				south = me[24:25]
+				vel_ns = me[25:35].uint - 1
+				if subtype == 2:
+					vel_ew *= 4		
+					vel_ns *= 4
+				if west:
+					vel_ew *= -1
+				if south: 
+					vel_ns *= -1
+
+				vel = math.sqrt(math.pow(vel_ew, 2) + math.pow(vel_ns, 2))
+				heading = math.atan2(vel_ew, vel_ns) / math.pi * 180
+				if heading < 0:
+					heading += 360
+				headingStr = "%u deg True" % heading
+
+			elif subtype == 2 or subtype == 4:
+				# air referenced velocity
+				heading_valid = me[13:14]
+				heading = me[14:24].uint
+				heading = 360.0 * heading / 1024	#units of 360/1024
+				if heading_valid == False:
+					heading = 0
+				mag_heading = me[54:55]
+				if mag_heading:
+					headingStr = "%u deg Magnetic" % heading
+				else:
+					headingStr = "%u deg True" % heading
+				vel = me[25:35].uint - 1
+				if subtype == 4:
+					vel *= 4
+
+			if vel == 0:
+				velStr = "Speed unavailable"
+			elif subtype == 3 or subtype == 4:
+				velStr = "Airspeed %u kts" % vel
+			else:
+				velStr = "Ground speed %u kts" % vel
+			
+			if vrate == 0:
+				vertStr = "Vertical rate unavailable"
+			else:	
+				if down:
+					vrate *= -1;
+				vertStr = "%d ft/min" % (vrate*64)
+
+			if crcgood:
+				# store aa, velStr, heading, vertStr
+				a = self.lookupAircraft(aa)
+				if a == None:
+					a = self.recordAircraft(aa)
+				caStr = ""
+				a.setAirborneVel(velStr, heading, vertStr, caStr)
+				self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
+
+			accStr = self.decodeNavAccuracy(nacp)
+			self.logMsg( " DF%u (TIS-B): Aircraft ID %s. CF=%u, IMF=%u, TC=%u, NACP=%u %s, %s, %s, heading: %s" % \
+				(df, aaStr, cf, imf, tc, nacp, accStr, velStr, vertStr, headingStr))
+
+		else:
+			self.logMsg(" DF%u (TIS-B): Aircraft ID %s. CF=%u, TC=%u" % (df, aaStr, cf, tc))
+			print "Need decoder for DF18, CF %u, type %u:" % (cf, tc), self.ba2hex(pkt)
+			
+			
+	# these are used for DF17, DF18
+	def typeCodeStrDF17_18(self, tc):
 		if tc == 0:
 			tcStr = "No position info."
 		elif tc == 1:
@@ -448,172 +765,38 @@ class AdsbDecoder(QObject):
 			tcStr = "Target state and status."
 		elif tc == 31:
 			tcStr = "Aircraft operational status."
+		return tcStr
 
-		if len(pkt) < 112:
-			print "short DF17 pkt"
-			return
-
-		if tc >= 1 and tc <=4:
-			# Aircraft Identification String BDS0,8
-			cat = me[5:8].uint
-			# fixme - these decode differently for TC1,2,3
-			catStr = ""
-			if cat == 0:
-				catStr = "A/C category unavailable"
-			elif cat == 1:
-				catStr = "Light weight <15K pounds"
-			elif cat == 2:
-				catStr = "Medium weight <75K pounds"
-			elif cat == 3:
-				catStr = "Medium weight <300K pounds"
-			elif cat == 4:
-				catStr = "Strong vortex aircraft"
-			elif cat == 5:
-				catStr = "Heavy weight >300K pounds"
-			elif cat == 6:
-				catStr = "High performance, high speed"
-			elif cat == 7:
-				catStr = "Rotorcraft"
-			else:
-				catStr = "Category %u" % (cat)
-			id = self.decodeChars(me[8:56])
-			if crcgood:
-				a = self.lookupAircraft(aa)
-				if a == None:
-					a = self.recordAircraft(aa)
-				a.setIdentityInfo(id, catStr)
-				#print "  Aircraft identifier: %s, %s" % (id, catStr)
-				self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
-			
-		if tc >=5 and tc <=8:
-			# Surface position BDS0,6
-			movement = me[5:12].uint
-			gtv = me[12:13].uint
-			track = me[13:20].uint
-			timesync = me[20:21].uint
-			oddeven = me[21:22].uint
-			cprlat = me[22:39].uint
-			cprlong = me[39:56].uint
-			[lat, lon] = self.decodeCPR(cprlong, cprlat, 17, 90, oddeven)
-			posStr = " at (%f, %f)" % (lat, lon)
-			moveStr = self.decodeMovement(movement)
-			#print "  DF17: %hx %hx tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u mvmt=%u (%s), pos %s:" % (ca, aa, tc, oddeven, timesync, cprlat, cprlong, movement, moveStr, posStr)
-			self.logMsg("  DF17: %hx %hx tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u mvmt=%u (%s)" % (ca, aa, tc, oddeven, timesync, cprlat, cprlong, movement, moveStr))
-			if crcgood:
-				# store aa, ONGROUND, posStr, moveStr
-				a = self.lookupAircraft(aa)
-				if a == None:
-					a = self.recordAircraft(aa)
-				a.setGroundPos(posStr, moveStr, caStr)
-				self.emit(SIGNAL("updateAircraftPosition(PyQt_PyObject)"), a)
-				# FIXME - emit updateAircraftPosition also
-			
-		if tc >=9 and tc <=22 and tc != 19:	
-			# Airborne position BDS0,5
-			ss = me[5:7].uint		# fime decode per (A.2.3.2.6)
-			ant = me[7:8].uint		# fixme (A.2.3.2.5)
-			ac = me[8:20]
-			#print len(me[8:15]), len(me[15:20]), len(ac)
-			if tc >= 20 and tc <= 22:
-				alt = ac.uint				# GPS HAE (fixme - units?)
-				altStr = "%d units?" % (alt)
-				altTypeStr =  "GPS HAE"
-			else:
-				# m bit is omitted, add it back
-				ac = ac[0:6] + bitstring.BitArray(bin='0') + ac[6:12] 	
-				[alt, altStr] = self.AltitudeCode(ac)	# barometric
-				altTypeStr =  "barometric"
-			timesync = me[20:21].uint
-			oddeven = me[21:22].uint
-			cprlat = me[22:39].uint
-			cprlong = me[39:56].uint
-			self.logMsg("  DF17: %hx %hx %s tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u" % (ca, aa, altStr, tc, oddeven, timesync, cprlat, cprlong))
-			[lat, lon] = self.decodeCPR(cprlong, cprlat, 17, 360, oddeven)
-			posStr = " at (%f, %f)" % (lat, lon)
-			#print "  DF17: %hx %hx %s tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u, pos %s" % (ca, aa, altStr, tc, oddeven, timesync, cprlat, cprlong, posStr)
-			#print pkt, crcgood
-			if crcgood:
-				# store aa, AIRBORNE, posStr, altStr, posUncertStr, altTypeStr
-				a = self.lookupAircraft(aa)
-				if a == None:
-					a = self.recordAircraft(aa)
-				a.setAirbornePos(lat, lon, alt, posUncertStr, altTypeStr, caStr)
-				self.emit(SIGNAL("updateAircraftPosition(PyQt_PyObject)"), a)
-				# FIXME - emit updateAircraftPosition also
-
-		if tc == 19:
-			# Airborne velocity BDS0,9
-			st1 = me[5:8].uint
-			st2 = me[8:11].uint
-			icf = me[8:9].uint
-			ifr = me[9:10].uint
-			nuc = me[10:13].uint
-			west = me[13:14]
-			vel_ew = me[14:24].uint - 1
-			south = me[24:25]
-			vel_ns = me[25:35].uint - 1
-			baro = me[35:36]
-			down = me[36:37]
-			vrate = me[37:46].uint
-
-			if st1 == 2 or st1 == 4:
-				vel_ew *= 4
-				vel_ns *= 4
-			if west:
-				vel_ew *= -1
-			if south: 
-				vel_ns *= -1
-
-			vel = math.sqrt(math.pow(vel_ew, 2) + math.pow(vel_ns, 2))
-			heading = math.atan2(vel_ew, vel_ns) / math.pi * 180
-			if heading < 0:
-				heading += 360
-
-			if vel == 0:
-				velStr = "Speed unavailable"
-			elif st1 == 1 or st1 == 2:
-				velStr = "Ground speed %u kts" % vel
-			elif st1 == 3 or st1 == 4:
-				velStr = "Airspeed %u kts" % vel
-			else:
-				velStr = "Reserved"
-			
-			if vrate == 0:
-				vertStr = "Vertical rate unavailable"
-			else:	
-				if down:
-					vrate *= -1;
-				vertStr = "%d ft/min" % (vrate*64)
-				if baro:
-					vertStr += " (barometric)"
-				else:
-					vertStr += " (GPS)"
-
-			#print "%u %u %u Heading %d deg. %s. %s." % (icf, ifr, nuc, heading, velStr, vertStr)
-			if crcgood:
-				# store aa, velStr, heading, vertStr
-				a = self.lookupAircraft(aa)
-				if a == None:
-					a = self.recordAircraft(aa)
-				a.setAirborneVel(velStr, heading, vertStr, caStr)
-				self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
-
-		if aa == 0x555555:
-			aaStr = "Anonymous"
+	# used for TIS-B NACp decoding.  Maybe others
+	def decodeNavAccuracy(self, p):
+		if p == 0:
+			s = "accuracy unknown"
+		elif p == 1:
+			s = "within 20km"
+		elif p == 2:
+			s = "within 10km"
+		elif p == 3:
+			s = "within 5km"
+		elif p == 4:
+			s = "within 2km"
+		elif p == 5:
+			s = "within 1km"
+		elif p == 6:
+			s = "within 500m"
+		elif p == 7:
+			s = "within 200m"
+		elif p == 8:
+			s = "within 100m"
+		elif p == 9:
+			s = "within 30m"
+		elif p == 10:
+			s = "within 10m"
+		elif p == 11:
+			s = "within 3m"
 		else:
-			aaStr = "%hx" % (aa)
-			
-		if crcgood:
-			# CRC good 
-			errStr = ""
-			self.stats.goodPkts += 1
-		else:
-			errStr = "CRC error (expected %x, rx %x)." % (crc.uint, pi.uint)
-			self.stats.CrcErrs += 1
-		#print "  DF%u (Extended Squitter): Aircraft ID %s%s. %s %s" % (df, aaStr, posStr, tcStr, errStr)
-		self.logMsg("  DF%u (Extended Squitter): Aircraft ID %s%s. %s %s" % (df, aaStr, posStr, tcStr, errStr))
-
-
+			s = "reserved"
+		return s
+		
 	def decodeMovement(self, m):
 		# refer to A.2.3.3.1
 		if m == 0:
@@ -954,6 +1137,8 @@ class AdsbDecoder(QObject):
 			c = "France"
 		elif aa >= 0x400000 and aa < 0x440000:
 			c = "United Kingdom"
+		elif aa >= 0x3C0000 and aa < 0x400000:
+			c = "Germany"
 		elif aa >= 0x480000 and aa < 0x488000:
 			c = "Netherlands"
 		elif aa >= 0x490000 and aa < 0x498000:
@@ -1054,59 +1239,100 @@ class AdsbDecoder(QObject):
 		#d = (0x8d, 0xa8, 0x23, 0x3e, 0x58, 0x1b, 0x84, 0x86, 0xcc, 0x32, 0x53, 0x6f, 0x41, 0x23)
 		#d = (0x8d , 0xa6 , 0xb2 , 0x49 , 0x26 , 0x51 , 0x0d , 0x47 , 0x9a , 0x10 , 0x21 , 0xac , 0x93 , 0x83)
 		#d = (0x8d,0xac,0xf1,0x5b,0x99,0x44,0xcf,0x87,0xe8,0x44,0x86,0x32,0x94,0x52)
-		d = (0x8d ,0xa7 ,0x1e ,0xfa ,0x36 ,0x09 ,0x51 ,0x30 ,0x2a ,0x32 ,0x09 ,0x04 ,0x3e ,0xb2)
+		# debugging CPR decoding...
+		#d = (0x8d ,0xa7 ,0x1e ,0xfa ,0x36 ,0x09 ,0x51 ,0x30 ,0x2a ,0x32 ,0x09 ,0x04 ,0x3e ,0xb2)
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x20 ,0x08 ,0x29 ,0xb7 ,0xd3 ,0xea )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb1 ,0x9a ,0x20 ,0x04 ,0x29 ,0xfc ,0x83 ,0x24 )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x60 ,0xbd ,0xf4 ,0x75 ,0x15 ,0xca ,0x1e ,0x51 ,0x0f ,0x21 )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x60 ,0xbd ,0xf0 ,0xde ,0xe5 ,0x99 ,0x70 ,0x74 ,0x4a ,0x80 )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x20 ,0x04 ,0xe0 ,0x71 ,0xc3 ,0x0d ,0xa0 ,0x21 ,0x0d ,0x67 )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x60 ,0xbd ,0xf4 ,0x73 ,0xf3 ,0xcb ,0x33 ,0x50 ,0x09 ,0xf8 )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x48 ,0x04 ,0x29 ,0x5e ,0xaf ,0x99 )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x60 ,0xbf ,0x00 ,0xdd ,0xb2 ,0xc4 ,0x66 ,0x58 ,0x72 ,0x13 )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x58 ,0xbd ,0xf4 ,0x72 ,0x9d ,0x67 ,0x8a ,0x2b ,0x40 ,0x4e )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x20 ,0x04 ,0xe0 ,0x71 ,0xc3 ,0x0d ,0xa0 ,0x21 ,0x0d ,0x67 )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x58 ,0xbf ,0x00 ,0xdc ,0x8a ,0xc5 ,0x90 ,0x25 ,0x5e ,0xe4 )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x58 ,0xbf ,0x00 ,0xdc ,0x60 ,0xc5 ,0xba ,0x74 ,0x79 ,0x7f )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x91 ,0xb0 ,0x9a ,0x48 ,0x04 ,0x29 ,0xcf ,0x68 ,0xe6 )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x91 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0xa1 ,0xca ,0xee )
+		#self.decode(d)
+		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x58 ,0xbf ,0x04 ,0x71 ,0x79 ,0x68 ,0xaf ,0x1d ,0xba ,0xe2 )
+		#self.decode(d)
+		# testing TIS-B
+		d = (0x95, 0xac, 0x07, 0x6a, 0x99, 0x3c, 0x2f, 0x08, 0xe0, 0x5a, 0x20, 0x47, 0xc7, 0x12)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x20 ,0x08 ,0x29 ,0xb7 ,0xd3 ,0xea )
+		d = (0x95, 0xac, 0x0b, 0x14, 0x68, 0x17, 0xf0, 0xf9, 0x92, 0x30, 0x86, 0x99, 0xe0, 0xec)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb1 ,0x9a ,0x20 ,0x04 ,0x29 ,0xfc ,0x83 ,0x24 )
+		d = (0x95, 0xac, 0x0b, 0x14, 0x68, 0x17, 0xf4, 0x8f, 0x02, 0xdd, 0xca, 0x64, 0x53, 0xc5)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		d = (0x95, 0xac, 0x04, 0x12, 0x68, 0x0f, 0xf1, 0x17, 0x3a, 0x1c, 0xb4, 0xc4, 0x67, 0xb8)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x60 ,0xbd ,0xf4 ,0x75 ,0x15 ,0xca ,0x1e ,0x51 ,0x0f ,0x21 )
+		d = (0x95, 0xac, 0x04, 0x12, 0x99, 0x38, 0x2b, 0x1c, 0x40, 0x6a, 0x20, 0xe1, 0xab, 0x56)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		d = (0x95, 0xac, 0x0f, 0x46, 0x68, 0x13, 0xb4, 0x77, 0xe2, 0xe1, 0x07, 0x9e, 0x54, 0x60)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x60 ,0xbd ,0xf0 ,0xde ,0xe5 ,0x99 ,0x70 ,0x74 ,0x4a ,0x80 )
+		d = (0x95, 0xac, 0x03, 0x06, 0x68, 0x07, 0x70, 0xe3, 0x9c, 0x32, 0x2e, 0x77, 0x28, 0x26)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		d = (0x95, 0xac, 0x03, 0x06, 0x68, 0x07, 0x74, 0x79, 0x6a, 0xdf, 0x69, 0xe7, 0x4e, 0xde)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		d = (0x95, 0xac, 0x03, 0x06, 0x99, 0x38, 0x33, 0x87, 0x80, 0x06, 0x20, 0xdd, 0xb1, 0x6b)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		d = (0x95, 0xac, 0x0b, 0x14, 0x99, 0x40, 0x05, 0x0a, 0x60, 0x26, 0x20, 0x79, 0x23, 0x42)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x20 ,0x04 ,0xe0 ,0x71 ,0xc3 ,0x0d ,0xa0 ,0x21 ,0x0d ,0x67 )
+		d = (0x95, 0xac, 0x0b, 0x14, 0x68, 0x19, 0x00, 0xf9, 0xe6, 0x30, 0x8d, 0xc2, 0x14, 0x97)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x60 ,0xbd ,0xf4 ,0x73 ,0xf3 ,0xcb ,0x33 ,0x50 ,0x09 ,0xf8 )
+		d = (0x95, 0xac, 0x04, 0x12, 0x68, 0x11, 0x94, 0xac, 0xf2, 0xca, 0x64, 0x04, 0x20, 0x6b)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x48 ,0x04 ,0x29 ,0x5e ,0xaf ,0x99 )
+		d = (0x95, 0xac, 0x0f, 0x46, 0x68, 0x13, 0xe0, 0xe1, 0xb4, 0x33, 0xe7, 0x21, 0x79, 0x7c)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		d = (0x95, 0xac, 0x03, 0x06, 0x99, 0x38, 0x33, 0x87, 0x60, 0x06, 0x20, 0xf8, 0x31, 0xbd)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x60 ,0xbf ,0x00 ,0xdd ,0xb2 ,0xc4 ,0x66 ,0x58 ,0x72 ,0x13 )
+		d = (0x95, 0xac, 0x0f, 0x46, 0x68, 0x13, 0xe0, 0xe1, 0x82, 0x33, 0xf0, 0x6a, 0x88, 0x3f)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		d = (0x95, 0xac, 0x0f, 0x46, 0x68, 0x13, 0xe4, 0x77, 0x5a, 0xe1, 0x22, 0x8e, 0xd8, 0x13)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x58 ,0xbd ,0xf4 ,0x72 ,0x9d ,0x67 ,0x8a ,0x2b ,0x40 ,0x4e )
+		d = (0x95, 0xac, 0x0f, 0x46, 0x99, 0x38, 0x28, 0x8c, 0x40, 0x2a, 0x20, 0x29, 0x58, 0x78)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x20 ,0x04 ,0xe0 ,0x71 ,0xc3 ,0x0d ,0xa0 ,0x21 ,0x0d ,0x67 )
+		d = (0x95, 0xac, 0x07, 0xe3, 0x68, 0x0d, 0x11, 0x19, 0xd4, 0x17, 0x4d, 0xab, 0xaa, 0x1e)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x58 ,0xbf ,0x00 ,0xdc ,0x8a ,0xc5 ,0x90 ,0x25 ,0x5e ,0xe4 )
+		d = (0x95, 0xac, 0x07, 0xe3, 0x68, 0x0d, 0x14, 0xae, 0xba, 0xc5, 0x1a, 0x41, 0x64, 0x1d)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x11 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0x30 ,0x0d ,0x91 )
+		d = (0x95, 0xac, 0x0b, 0x14, 0x68, 0x19, 0x10, 0xfa, 0x14, 0x30, 0x89, 0x6d, 0xeb, 0xf0)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x58 ,0xbf ,0x00 ,0xdc ,0x60 ,0xc5 ,0xba ,0x74 ,0x79 ,0x7f )
+		d = (0x95, 0xac, 0x0b, 0x14, 0x68, 0x19, 0x14, 0x8f, 0x82, 0xdd, 0xcd, 0xc0, 0xd6, 0xc6)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x91 ,0xb0 ,0x9a ,0x48 ,0x04 ,0x29 ,0xcf ,0x68 ,0xe6 )
+		d = (0x95, 0xac, 0x0b, 0x14, 0x99, 0x40, 0x05, 0x0a, 0x60, 0x22, 0x20, 0x41, 0x15, 0x42)
 		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x99 ,0x91 ,0xb0 ,0x9a ,0x40 ,0x04 ,0x29 ,0xa1 ,0xca ,0xee )
-		self.decode(d)
-		d = (0x8d ,0x86 ,0x91 ,0x44 ,0x58 ,0xbf ,0x04 ,0x71 ,0x79 ,0x68 ,0xaf ,0x1d ,0xba ,0xe2 )
-		self.decode(d)
-		#self.DecodeDF17(bitstring.BitArray(hex='0x8d71bf55200414b2c748205b4844'))
-		#DecodeDF17(bitstring.BitArray(hex='8da6b2495877847f8ee8829a8afc0563'))
-		#b = bitstring.BitArray('0b110010')
-		#print charDecode(b)
-		
 		return
 
 	    
