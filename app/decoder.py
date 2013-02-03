@@ -396,7 +396,7 @@ class AdsbDecoder(QObject):
 
 		posUncertStr = ""
 
-		tcSstr = self.typeCodeStrDF17_18(tc)
+		tcStr = self.typeCodeStrDF17_18(tc)
 
 		if len(pkt) < 112:
 			print "short DF17 pkt"
