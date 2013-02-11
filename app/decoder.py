@@ -2,6 +2,8 @@
 # prereqs: bitstring simplekml PyUSB 
 # 	"easy_install bitstring simplekml PyUSB"
 # B. Kuschak, OpenADSB Project <brian@openadsb.com>
+# Some parts based on:
+# 	gr-air-modes # Copyright 2010, 2012 Nick Foster
 #
 
 import sys
