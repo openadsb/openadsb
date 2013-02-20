@@ -14,7 +14,7 @@ import dlg_origin
 import dlg_kml
 import client
 #import server
-import server_new
+import server
 import db
 import gmaps
 import gearth
