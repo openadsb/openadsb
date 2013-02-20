@@ -1,17 +1,20 @@
 # Dialog for configuration of the data sharing over network connections.
 # B. Kuschak, OpenADSB Project <brian@openadsb.com>
 #
+from settings import *
 import PyQt4
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
 class DlgConfigSharing(QDialog):
 
-	def __init__(self, args, parent = None):
+	myGroupName = "sharing"		# for QSettings
+
+	def __init__(self, parent = None):
 		QDialog.__init__(self, parent)
 		self.setModal(True)
 		self.setWindowTitle("Configure Data Sharing")
-		self.args = args
+		self.formats = [ "PlanePlotter", "AVR", "OpenADSB v1 ASCII" ]
 
 		vbox = QVBoxLayout()
 		self.setLayout(vbox)
@@ -44,6 +47,7 @@ class DlgConfigSharing(QDialog):
 		l3 = QLabel("Packet format to send")
 		cgrid.addWidget(l3, 3, 0)
 		self.cfmt = QComboBox()
+		self.cfmt.addItems(self.formats)
 		cgrid.addWidget(self.cfmt, 3, 1)
 
 	
@@ -67,6 +71,7 @@ class DlgConfigSharing(QDialog):
 		l3 = QLabel("Packet format to serve")
 		sgrid.addWidget(l3, 3, 0)
 		self.sfmt = QComboBox()
+		self.sfmt.addItems(self.formats)
 		sgrid.addWidget(self.sfmt, 3, 1)
 
 		buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -76,66 +81,64 @@ class DlgConfigSharing(QDialog):
 		self.connect(buttonBox, SIGNAL("accepted()"), self, SLOT("accept()"))
 		self.connect(buttonBox, SIGNAL("rejected()"), self, SLOT("reject()"))
 		self.resize(max(self.sizeHint().width(), 10), self.sizeHint().height())
+		self.show()
+		self.raise_()
 
 	def setValues(self):
-		self.enableClient.setChecked(self.args['enableClient'])
-		self.enableServer.setChecked(self.args['enableServer'])
-		self.client.setText(self.args['client'])
-		self.cport.setText(str(self.args['clientPort']))
-		self.sport.setText(str(self.args['serverPort']))
-		self.cfmt.addItems(self.args['formats']) 
-		self.sfmt.addItems(self.args['formats']) 
-		self.sfmt.setCurrentIndex(0)			# fixme
-		self.cfmt.setCurrentIndex(2)			# fixme
-		self.maxConn.setText(str(self.args['maxConn']))
+		s = mySettings()
+		s.beginGroup(self.myGroupName)
+		self.enableClient.setChecked(s.value('enableClient').toBool())
+		self.enableServer.setChecked(s.value('enableServer').toBool())
+		self.client.setText(s.value('client').toString())
+		self.cport.setText(s.value('clientPort').toString())
+		self.sport.setText(s.value('serverPort').toString())
+		self.sfmt.setCurrentIndex(self.sfmt.findText(s.value('serverFormat').toString()))
+		self.cfmt.setCurrentIndex(self.cfmt.findText(s.value('clientFormat').toString()))
+		self.maxConn.setText(s.value('maxConn').toString())
+		s.endGroup()
 
 	def accept(self):
 		QDialog.accept(self)
-		self.args['enableClient'] = self.enableClient.isChecked()
-		self.args['enableServer'] = self.enableServer.isChecked()
-		self.args['serverPort'] = int(self.sport.text())
-		self.args['clientPort'] = int(self.cport.text())
-		self.args['serverFormat'] = str(self.sfmt.currentText())
-		self.args['clientFormat'] = str(self.cfmt.currentText())
-		self.args['client'] = str(self.client.text())
-		self.args['maxConn'] = int(self.maxConn.text())
+		s = mySettings()
+		s.beginGroup(self.myGroupName)
+		s.setValue('enableClient', self.enableClient.isChecked())
+		s.setValue('enableServer', self.enableServer.isChecked())
+		s.setValue('serverPort', self.sport.text())
+		s.setValue('clientPort', self.cport.text())
+		s.setValue('serverFormat', self.sfmt.currentText())
+		s.setValue('clientFormat', self.cfmt.currentText())
+		s.setValue('client', self.client.text())
+		s.setValue('maxConn', int(self.maxConn.text()))
+		s.endGroup()
 		
 	@staticmethod
-	#def get(enableClient, enableServer, parent = None):
-	def get(args, parent = None):
-		#args = dict()
-		#args['enableClient'] = True
-		#args['enableServer'] = True
-		#args['client'] = "1.2.3.4"
-		#args['clientPort'] = 57575
-		#args['serverPort'] = 56565
-		#args['maxConn'] = 5
-		#args['formats'] = ["PlanePlotter", "AVR", "OpenADSB v1 ASCII"]
-		#args['clientFormat'] = args['formats'][2]
-		#args['serverFormat'] = args['formats'][0]
-		dlg = DlgConfigSharing(args, parent)
+	def dumpSettings():
+		s = mySettings()
+		s.beginGroup(DlgConfigSharing.myGroupName)
+		for key in s.allKeys():
+			print "'%s' = '%s'" % (key, s.value(key).toString())
+		s.endGroup()
+
+	@staticmethod
+	def get(parent = None):
+		dlg = DlgConfigSharing(parent)
 		accept = dlg.exec_()
-		return(accept, dlg.args)
+		return (accept, DlgConfigSharing.myGroupName)
+
+	@staticmethod
+	def groupName():
+		return DlgConfigSharing.myGroupName
+
 
 # for testing
 if __name__ == "__main__":
 	import sys
 	app = QApplication(sys.argv)
 
-	args = dict()
-	args['enableClient'] = True
-	args['enableServer'] = True
-	args['client'] = "1.2.3.4"
-	args['clientPort'] = 57575
-	args['serverPort'] = 56565
-	args['maxConn'] = 5
-	args['formats'] = ["PlanePlotter", "AVR", "OpenADSB v1 ASCII"]
-	args['clientFormat'] = args['formats'][2]
-	args['serverFormat'] = args['formats'][0]
-	(accept, args) = DlgConfigSharing.get(args)
+	(accept, groupName) = DlgConfigSharing.get()
 	if accept:
-		print args
+		DlgConfigSharing.dumpSettings()
+		print "accepted"
 
-	#ret = app.exec_()
 
 
