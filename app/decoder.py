@@ -348,6 +348,7 @@ class AdsbDecoder(QObject):
 			self.stats.goodPkts += 1
 		else:
 			crcStr = "CRC error or no all-call received yet from ID %x." % (aa.uint)
+			self.stats.CrcErrs += 1
 		#print "  DF%u (Identity Reply): IID=%u. %s. Squawk %04u. %s. ap=%x. %s" % (df, iis, fsStr, squawk, drStr, ap.uint, crcStr )
 		self.logMsg( "  DF%u (Identity Reply): IID=%u. %s. Squawk %04u. %s. %s" % (df, iis, fsStr, squawk, drStr, crcStr ))
 
@@ -369,12 +370,18 @@ class AdsbDecoder(QObject):
 			self.stats.goodPkts += 1
 		else:
 			errStr = "CRC error (expected %x, rx %x)." % (crc.uint, pi.uint)
+			self.stats.CrcErrs += 1
 		#print "  DF%u (Mode S All-Call Reply): %s Aircraft ID %03hx. %s" % (df, caStr, aa, errStr)
 		self.logMsg("  DF%u (Mode S All-Call Reply): %s Aircraft ID %03hx. %s" % (df, caStr, aa, errStr))
 			
 
 	def DecodeDF17(self, pkt):
+		if len(pkt) < 112:
+			print "short DF17 pkt"
+			return
+
 		posStr = ""
+		logStr = ""
 		# 112-bit packet
 		# fixme - decode ca, me, lookup ICAO24
 		df = pkt[0:5].uint
@@ -391,16 +398,22 @@ class AdsbDecoder(QObject):
 		caStr = self.capabilitiesStr(ca)
 		if crc == pi:
 			crcgood = True
+			errStr = ""
+			self.stats.goodPkts += 1
 		else:
 			crcgood = False
+			errStr = "CRC error (expected %x, rx %x)." % (crc.uint, pi.uint)
+			self.stats.CrcErrs += 1
 
+		if aa == 0x555555:
+			aaStr = "Anonymous"
+		else:
+			aaStr = "%hx" % (aa)
+			
 		posUncertStr = ""
 
 		tcStr = self.typeCodeStrDF17_18(tc)
 
-		if len(pkt) < 112:
-			print "short DF17 pkt"
-			return
 
 		if tc >= 1 and tc <=4:
 			# Aircraft Identification String BDS0,8
@@ -431,7 +444,7 @@ class AdsbDecoder(QObject):
 				if a == None:
 					a = self.recordAircraft(aa)
 				a.setIdentityInfo(id, catStr)
-				#print "  Aircraft identifier: %s, %s" % (id, catStr)
+				logStr = "Identifier: %s, %s." % (id, catStr)
 				self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
 			
 		elif tc >=5 and tc <=8:
@@ -444,25 +457,22 @@ class AdsbDecoder(QObject):
 			cprlat = me[22:39].uint
 			cprlong = me[39:56].uint
 			[lat, lon] = self.decodeCPR(cprlong, cprlat, 17, 90, oddeven)
-			posStr = " at (%f, %f)" % (lat, lon)
+			posStr = "at (%f, %f)" % (lat, lon)
 			moveStr = self.decodeMovement(movement)
-			#print "  DF17: %hx %hx tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u mvmt=%u (%s), pos %s:" % (ca, aa, tc, oddeven, timesync, cprlat, cprlong, movement, moveStr, posStr)
-			self.logMsg("  DF17: %hx %hx tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u mvmt=%u (%s)" % (ca, aa, tc, oddeven, timesync, cprlat, cprlong, movement, moveStr))
 			if crcgood:
 				# store aa, ONGROUND, posStr, moveStr
 				a = self.lookupAircraft(aa)
 				if a == None:
 					a = self.recordAircraft(aa)
 				a.setGroundPos(posStr, moveStr, caStr)
+				logStr = "%s CPR: %u, %u %s. %s." % ("Odd" if oddeven else "Even", cprlat, cprlong, posStr, moveStr)
 				self.emit(SIGNAL("updateAircraftPosition(PyQt_PyObject)"), a)
-				# FIXME - emit updateAircraftPosition also
 			
 		elif tc >=9 and tc <=22 and tc != 19:	
 			# Airborne position BDS0,5
 			ss = me[5:7].uint		# fime decode per (A.2.3.2.6)
 			ant = me[7:8].uint		# fixme (A.2.3.2.5)
 			ac = me[8:20]
-			#print len(me[8:15]), len(me[15:20]), len(ac)
 			if tc >= 20 and tc <= 22:
 				alt = ac.uint				# GPS HAE (fixme - units?)
 				altStr = "%d units?" % (alt)
@@ -476,19 +486,16 @@ class AdsbDecoder(QObject):
 			oddeven = me[21:22].uint
 			cprlat = me[22:39].uint
 			cprlong = me[39:56].uint
-			self.logMsg("  DF17: %hx %hx %s tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u" % (ca, aa, altStr, tc, oddeven, timesync, cprlat, cprlong))
 			[lat, lon] = self.decodeCPR(cprlong, cprlat, 17, 360, oddeven)
-			posStr = " at (%f, %f)" % (lat, lon)
-			#print "  DF17: %hx %hx %s tc=%u odd=%u timesync=%u cprlat=%u, cprlon=%u, pos %s" % (ca, aa, altStr, tc, oddeven, timesync, cprlat, cprlong, posStr)
-			#print pkt, crcgood
+			posStr = "at (%f, %f)" % (lat, lon)
 			if crcgood:
 				# store aa, AIRBORNE, posStr, altStr, posUncertStr, altTypeStr
 				a = self.lookupAircraft(aa)
 				if a == None:
 					a = self.recordAircraft(aa)
 				a.setAirbornePos(lat, lon, alt, posUncertStr, altTypeStr, caStr)
+				logStr = "%s CPR: %u, %u %s." % ("Odd" if oddeven else "Even", cprlat, cprlong, posStr)
 				self.emit(SIGNAL("updateAircraftPosition(PyQt_PyObject)"), a)
-				# FIXME - emit updateAircraftPosition also
 
 		elif tc == 19:
 			# Airborne velocity BDS0,9
@@ -538,33 +545,264 @@ class AdsbDecoder(QObject):
 				else:
 					vertStr += " (GPS)"
 
-			#print "%u %u %u Heading %d deg. %s. %s." % (icf, ifr, nuc, heading, velStr, vertStr)
 			if crcgood:
 				# store aa, velStr, heading, vertStr
 				a = self.lookupAircraft(aa)
 				if a == None:
 					a = self.recordAircraft(aa)
 				a.setAirborneVel(velStr, heading, vertStr, caStr)
+				logStr = "Heading %u. %s. %s." %  (heading, velStr, vertStr)
 				self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
 
+		elif tc == 28:
+			# Emergency/Priority status or TCAS RA broadcast
+			# contents of register 61
+			st = me[5:8].uint
+			if st == 1:
+				# Emergency/Priority status and Mode A
+				es = me[8:11].uint
+				modea = me[11:24]
+				res = me[24:56]
+				esStr = self.decodeEmergencyStatus(es)
+				squawk = self.squawkDecode(modea)
+
+				if crcgood:
+					a = self.lookupAircraft(aa)
+					if a == None:
+						a = self.recordAircraft(aa)
+					a.setEmergStatus(squawk, esStr)
+					logStr = "Squawk %u. %s." %  (squawk, esStr)
+					self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
+
+			elif st == 2:
+				# TCAS RA Broadcast.  See Annex 10, 4.3.8.4.2.2
+				# subtype 1 is contents of register 30
+				ara = me[8:22]
+				rac = me[22:26]
+				ra_term = me[26:27].uint
+				multiple = me[27:28]
+				tti = me[28:30].uint
+				identity = me[30:56]
+		
+				if multiple:
+					threatStr = "Multiple threats"
+					if ra_term:
+						threatStr += " (terminated)"
+				elif not ara[0:1]:
+					threatStr = "No threats"
+				else:
+					threatStr = "Single threat"
+					if ra_term:
+						threatStr += " (terminated)"
+
+				if ara[0:1]:
+					threatStr += ". RA is "
+					if ara[1:2]:
+						threatStr += "corrective, "
+					else:
+						threatStr += "preventative, "
+					if ara[2:3]:
+						threatStr += "downward, "
+					else:
+						threatStr += "upward, "
+					if ara[3:4]:
+						threatStr += "increased rate, "
+					if ara[4:5]:
+						threatStr += "sense reversal, "
+					if ara[5:6]:
+						threatStr += "altitude crossing, "
+					if ara[6:7]:
+						threatStr += "positive, "
+					else:
+						threatStr += "vert limit, "
+					if ara[7:15]:
+						threatStr += "ACAS 3, "
+
+				elif multiple:
+					if ara[1:2]:
+						threatStr += "upward correction, "
+					if ara[2:3]:
+						threatStr += "positive climb, "
+					if ara[3:4]:
+						threatStr += "downward correction, "
+					if ara[4:5]:
+						threatStr += "positive descend, "
+					if ara[5:6]:
+						threatStr += "crossing, "
+					if ara[6:7]:
+						threatStr += "sense reversal, "
+					if ara[7:15]:
+						threatStr += "ACAS 3, "
+				threatStr.strip(", ") 		# strip trailing comma
+				threatStr += "."
+
+				racStr = ""
+				if rac[0:1]:
+					racStr += "Do not pass below"
+				if rac[1:2]:
+					if len(racStr) > 0:
+						racStr += ", "
+					racStr += "Do not pass above"
+				if rac[2:3]:
+					if len(racStr) > 0:
+						racStr += ", "
+					racStr += "Do not turn left"
+				if rac[3:4]:
+					if len(racStr) > 0:
+						racStr += ", "
+					racStr += "Do not turn right"
+				if len(racStr) > 0:
+					racStr += "."
+	
+				aid = 0
+				rangeStr = ""
+				if tti == 1:
+					aid = identity[0:24].uint				# mode S aircraft ID
+					rangeStr = "Threat ID: %hx" % (aid)
+				elif tti == 2:
+					[alt, altStr] = self.AltitudeCode(identity[0:13])	# altitude of threat
+					tidr = identity[13:20].uint
+					tidb = identity[20:26].uint
+					if tidr == 0:
+						rangeStr = "Range unavailable. "
+					elif tidr == 127:
+						rangeStr = "Range > 12.6 NM. "
+					else:
+						rangeStr = "Range %.1f NM. " % ((tidr-1)/10.0)
+					if tidb == 0:
+						rangeStr += "Bearing unavailable"
+					else:
+						rangeStr += "Bearing %u to %u" % (6*(tidb-1), 6*tidb)
+
+				if crcgood:
+					a = self.lookupAircraft(aa)
+					if a == None:
+						a = self.recordAircraft(aa)
+					#print "FIXME - Store TCAS RA"  
+					logStr =  "%s. %s. %s" %  (threatStr, rangeStr, racStr)
+
+				print "DF17 - bk:", logStr
+				
+			else:
+				print "need decoder for DF%u, type %u, subtype %u:" % (df, tc, st), self.ba2hex(pkt)
+
+		elif tc == 29:
+			# Target State and Status
+			# subtype 1 is contents of register 62
+			# emergency codes: 7500, 7600 or 7700
+			st = me[5:7].uint
+			if st == 0:
+				vert = me[7:9].uint
+				alt_t = me[9:10].uint
+				alt_cap = me[11:13].uint
+				vmode = me[13:15].uint
+				alt = me[15:25].uint
+				horz = me[25:27].uint
+				head = me[27:36].uint
+				head_track = me[36:37].uint
+				hmode = me[37:39].uint
+				nacp = me[39:43].uint
+				nacbaro = me[43:44].uint
+				sil = me[44:46].uint
+				cap = me[51:53].uint
+				es = me[53:56].uint
+				esStr = self.decodeEmergencyStatus(es)
+				print "FIXME - DF%u Target Status: %s, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u" % (df, esStr, vert, alt_t, alt_cap, vmode, alt, horz, head, head_track, hmode, nacp, nacbaro, sil, cap)
+				
+			elif st == 1:
+				altsel = me[8:9].uint
+				alt = me[9:20].uint
+				baro = me[20:29].uint	
+				stat = me[29:30].uint
+				sign = me[30:31].uint	
+				head = me[31:39].uint
+				nacp = me[39:43].uint
+				altselValid = me[46:47].uint
+				autopilot = me[47:48].uint
+				vnav = me[48:49].uint
+				altHold = me[49:50].uint
+				adsr = me[50:51].uint
+				approachMode = me[51:52].uint
+				tcas = me[52:53].uint
+
+				targStr = ""
+				if alt == 0:
+					altStr = "Unknown altitude target"
+				else:
+					altStr = "%u ft target" % ((alt-1)*32)
+
+				if baro == 0:
+					baroStr = "Unknown"
+				else:
+					baroStr = "%.1f mbar" % (0.8*(baro-1)+800)
+
+				if autopilot:
+					targStr += "Autopilot engaged. "
+				if altHold:
+					targStr += "Altitude Hold. "
+				if approachMode:
+					targStr += "Approach Mode. "
+				
+				#print "DF%u Target Status: %s, %s, %s Stat=%u, Sign=%u, head=%u, nacp=%u, altselValid=%u, vnav=%u, altHold=%u, adsr=%u, approachMode=%u, tcas=%u, autopilot=%u" % (df, altStr, baroStr, targStr, stat, sign, head, nacp, altselValid, vnav, altHold, adsr, approachMode, tcas, autopilot);
+
+				if crcgood:
+					a = self.lookupAircraft(aa)
+					if a == None:
+						a = self.recordAircraft(aa)
+					logStr =  "%s. %s. %s" %  (altStr, baroStr, targStr)
+					print "FIXME - DF17 %s" % (logStr)
+
+			else:
+				print "need decoder for DF%u, type %u, subtype %u:" % (df, tc, st), self.ba2hex(pkt)
+		
+		
+		elif tc == 31:
+			# Aircraft operational status, register 65
+			st = me[5:8].uint
+			ver = me[40:43].uint
+			hrd = me[53:54].uint
+			ccStr = ""
+			omStr = ""
+			if st == 0:
+				cc = me[8:24]
+				om = me[24:40]
+				ccStr = "Capabilities: "
+				if cc[0:2].uint == 0 and cc[2:3]:
+					ccStr += "TCAS, "
+				if cc[0:2].uint == 0 and cc[3:4]:
+					ccStr += "Ext Squitter Rx, "
+				if cc[0:2].uint == 0 and cc[6:7]:
+					ccStr += "Air-reference velocity report, "
+				if cc[0:2].uint == 0 and cc[7:8]:
+					ccStr += "Target-state report, "
+				if cc[0:2].uint == 0 and cc[8:10]:
+					ccStr += "Target-change report, "
+				if cc[0:2].uint == 0 and cc[10:11]:
+					ccStr += "UAT Rx, "
+				ccStr.strip(", ")					# remove trailing comma
+
+				if om[0:2].uint == 0 and om[2:3]:
+					omStr += "TCAS RA active, "			# fixme - this should be indicated in table
+				if om[0:2].uint == 0 and om[3:4]:
+					omStr += "IDENT active, "			# fixme - this should be indicated in table
+				if om[0:2].uint == 0 and om[5:6]:
+					omStr += "Single antenna, "			# fixme - this should be indicated in table
+				omStr.strip(", ")					# remove trailing comma
+
+				if crcgood:
+					a = self.lookupAircraft(aa)
+					if a == None:
+						a = self.recordAircraft(aa)
+					logStr =  "Version %u. %s. %s." %  (ver, ccStr, omStr)
+					# FIXME emit signal
+
+			else:
+				print "need decoder for DF%u, type %u, subtype %u:" % (df, tc, st), self.ba2hex(pkt)
 		else:
 			print "need decoder for DF%u, type %u:" % (df, tc), self.ba2hex(pkt)
 
-		if aa == 0x555555:
-			aaStr = "Anonymous"
-		else:
-			aaStr = "%hx" % (aa)
-			
-		if crcgood:
-			# CRC good 
-			errStr = ""
-			self.stats.goodPkts += 1
-		else:
-			errStr = "CRC error (expected %x, rx %x)." % (crc.uint, pi.uint)
-			self.stats.CrcErrs += 1
-		#print "  DF%u (Extended Squitter): Aircraft ID %s%s. %s %s" % (df, aaStr, posStr, tcStr, errStr)
-		self.logMsg("  DF%u (Extended Squitter): Aircraft ID %s%s. %s %s" % (df, aaStr, posStr, tcStr, errStr))
-		# fixme - print velStr, vertStr here...
+		self.logMsg("  DF%u (Extended Squitter): %s Aircraft ID %s. %s %s" % (df, tcStr, aaStr, logStr, errStr))
+		#print("  DF%u (Extended Squitter): %s Aircraft ID %s. %s %s" % (df, tcStr, aaStr, logStr, errStr))
 
 
 	def DecodeDF18(self, pkt):
@@ -576,12 +814,18 @@ class AdsbDecoder(QObject):
 		pi = pkt[88:112]
 		tc = me[0:5].uint	# type code - same as DF17?
 
+		if len(pkt) < 112:
+			print "short DF17 pkt"
+			return
+
 		aaStr = "%hx" % (aa)
 		crc = self.calcParity(pkt[0:88])
 		if crc == pi:
 			crcgood = True
+			self.stats.goodPkts += 1
 		else:
 			crcgood = False
+			self.stats.CrcErrs += 1
 	
 		tcStr = self.typeCodeStrDF17_18(tc)
 
@@ -609,17 +853,21 @@ class AdsbDecoder(QObject):
 			cprlat = me[22:39].uint
 			cprlong = me[39:56].uint
 			[lat, lon] = self.decodeCPR(cprlong, cprlat, 17, 360, oddeven)
-			posStr = " at (%f, %f)" % (lat, lon)
+			posStr = "at (%f, %f)" % (lat, lon)
 
 			if crcgood:
 				# store aa, AIRBORNE, posStr, altStr, posUncertStr, altTypeStr
-				# FIXME - if CF == 5, then the AA is fake (unique, but not ICAO registered)
+				# CF == 5, then the AA is fake (unique, but not ICAO registered)
 				a = self.lookupAircraft(aa)
 				if a == None:
 					a = self.recordAircraft(aa)
 				a.setAirbornePos(lat, lon, alt, "", altTypeStr, "")
+				if cf == 5 and imf == 0:
+					a.setFakeICAO24(True)
 				self.emit(SIGNAL("updateAircraftPosition(PyQt_PyObject)"), a)
 
+			#print(" DF%u (TIS-B): Aircraft ID %s. CF=%u, IMF=%u, TC=%u, SS=%u %s, %s %s, odd=%u, %s" % \
+				#(df, aaStr, cf, imf, tc, ss, ssStr, altStr, altTypeStr, oddeven, posStr))
 			self.logMsg(" DF%u (TIS-B): Aircraft ID %s. CF=%u, IMF=%u, TC=%u, SS=%u %s, %s %s, odd=%u, %s" % \
 				(df, aaStr, cf, imf, tc, ss, ssStr, altStr, altTypeStr, oddeven, posStr))
 		elif tc == 19:
@@ -689,9 +937,13 @@ class AdsbDecoder(QObject):
 					a = self.recordAircraft(aa)
 				caStr = ""
 				a.setAirborneVel(velStr, heading, vertStr, caStr)
+				if cf == 5 and imf == 0:
+					a.setFakeICAO24(True)
 				self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
 
 			accStr = self.decodeNavAccuracy(nacp)
+			#print( " DF%u (TIS-B): Aircraft ID %s. CF=%u, IMF=%u, TC=%u, NACP=%u %s, %s, %s, heading: %s" % \
+				#(df, aaStr, cf, imf, tc, nacp, accStr, velStr, vertStr, headingStr))
 			self.logMsg( " DF%u (TIS-B): Aircraft ID %s. CF=%u, IMF=%u, TC=%u, NACP=%u %s, %s, %s, heading: %s" % \
 				(df, aaStr, cf, imf, tc, nacp, accStr, velStr, vertStr, headingStr))
 
@@ -700,6 +952,27 @@ class AdsbDecoder(QObject):
 			print "Need decoder for DF18, CF %u, type %u:" % (cf, tc), self.ba2hex(pkt)
 			
 			
+	def decodeEmergencyStatus(self, es):
+		if es == 0:
+			esStr = "No emergency"
+		elif es == 1:
+			esStr = "General emergency"
+		elif es == 2:
+			esStr = "Medical emergency"
+		elif es == 3:
+			esStr = "Minimum-fuel emergency"
+		elif es == 4:
+			esStr = "No-communications emergency"
+		elif es == 5:
+			esStr = "Unlawful interference emergency"
+		elif es == 6:
+			esStr = "Downed-aircraft emergency"
+		elif es == 7:
+			esStr = "Reserved"
+		else:
+			esStr = ""
+		return esStr
+
 	# these are used for DF17, DF18
 	def typeCodeStrDF17_18(self, tc):
 		if tc == 0:
