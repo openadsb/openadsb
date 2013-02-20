@@ -16,28 +16,31 @@
     <script type="text/javascript">
       var map;
       
-      var myLatlng = new google.maps.LatLng(37.37, -122.02);
-      
       function initialize() {
+	// call back into Python to get some settings
+        var centerLat = settings.getCenterLat();
+        var centerLon = settings.getCenterLon();
+        var zoomLevel = settings.getZoomLevel();
         var myOptions = {
-          zoom: 14,
-          center: new google.maps.LatLng(37.37, -122.02),
-          mapTypeId: google.maps.MapTypeId.ROADMAP,
+          zoom: zoomLevel,
+          center: new google.maps.LatLng(centerLat, centerLon),
+          mapTypeId: google.maps.MapTypeId.TERRAIN,
           zoomControl: true,
           zoomControlOptions: { style: google.maps.ZoomControlStyle.SMALL },
         };
         
         map = new google.maps.Map(document.getElementById('map_canvas'), myOptions);
-        //printer.text('initialize() done');
-	//printer.init_done('init done');
-	//map.setCenter(new google.maps.LatLng(37.4419, -122.1419), 13);
+	
+	google.maps.event.addListener(map, 'zoom_changed', function() {
+		settings.zoomChanged(map.getZoom());
+	});
+	google.maps.event.addListener(map, 'center_changed', function() {
+		center = map.getCenter();
+		settings.centerChanged(center.lat(), center.lng());
+	});
       }       
 
-      function bktest() {
-	alert("bktest called");
-	map.setCenter(new google.maps.LatLng(37.4419, -122.1419), 13);
-      }
-
+      #printer.text("printing this from javascript in html");	
       google.maps.event.addDomListener(window, 'load', initialize);
       
     </script>

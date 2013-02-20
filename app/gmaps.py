@@ -5,15 +5,19 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 from PyQt4.QtWebKit import *
 import sys
+from settings_new import *
 
 
 js = """
 var plines = {};
 var infoWindow;
 var prevZIndex;
-function moveNewCenter()
+function moveNewCenter(lat, lon, zoom)
 {
-    map.setCenter(new google.maps.LatLng(37.4419, -122.1419), 13);
+    centerLat = lat;
+    centerLon = lon;
+    zoomLevel = zoom;
+    map.setCenter(new google.maps.LatLng(lat, lon), zoom);
 }
 function createPolyline(lat, lon, alt)
 {
@@ -93,23 +97,42 @@ function plotTrack(aa, lat, lon, alt)
     //printer.text(n);
 }
 """
+# save these in our settings, and restore on restart
+#map.getCenter()
+#map.getZoom()
+
+# from http://stackoverflow.com/questions/5792832/print-javascript-exceptions-in-a-qwebview-to-the-console
+class WebPage(QWebPage):
+	def javaScriptConsoleMessage(self, msg, line, source):
+		print 'WebPage: %s line %d: %s' % (source, line, msg)
 
 class gmaps(QWebView):
-	def __init__(self):
-		QWebView.__init__(self)
-		self.setPage(QWebPage())
+	def __init__(self, parent = None):
+		# BK - it seems like the page we load here doesn't get its javascript evaluated until AFTER we return from this function.
+		# That's good - we can add all our Python functions so they can be called immediately when the page is loaded
+		QWebView.__init__(self, parent)
+		self.centerLat = 0
+		self.centerLon = 0
+		self.zoomLevel = 0
+		#self.setPage(QWebPage())
+		self.setPage(WebPage())
 		self.settings().setAttribute(QWebSettings.JavascriptEnabled, True)
 		loc = QFileInfo(sys.argv[0])
 		url = QUrl.fromLocalFile(loc.absolutePath() + "/gmap.html")
 		self.load(url)
 		self.frame = self.page().mainFrame()
-		self.frame.evaluateJavaScript(js);		# load the functions
+		self.frame.evaluateJavaScript(js);		# load the functions above
+
 		# Allow javascript to call back into Qt
                 printer = ConsolePrinter(self.frame)
                 self.frame.addToJavaScriptWindowObject('printer', printer)
                 self.frame.evaluateJavaScript("printer.text('Testing Javascript printing from Qt... good!');")
+
                 highlighter = TableHighlighter(self.frame, self)
                 self.frame.addToJavaScriptWindowObject('highlighter', highlighter)
+
+                map_settings = mapSettings(self.frame, self)
+                self.frame.addToJavaScriptWindowObject('settings', map_settings)
 
 
 	# SLOTS
@@ -154,4 +177,56 @@ class TableHighlighter(QObject):
     def unhighlight(self, aa):
         #print "will unhighlight table id ", aa
 	self.parent.emit(SIGNAL("unhighlightAircraft(int)"), int(aa))
+
+
+class mapSettings(QObject):
+    def __init__(self, frame, parent=None):
+        super(mapSettings, self).__init__(parent)
+	self.parent = parent
+	self.frame = frame
+	self.getSettings()
+
+    def saveSettings(self):
+	settings = mySettings()
+	settings.beginGroup("googleMaps")
+	settings.setValue("zoomLevel", self.parent.zoomLevel)
+	settings.setValue("centerLat", self.parent.centerLat)
+	settings.setValue("centerLon", self.parent.centerLon)
+	settings.endGroup()
+
+    def getSettings(self):
+	settings = mySettings()
+	settings.beginGroup("googleMaps")
+	self.zoomLevel = settings.value("zoomLevel").toInt()[0]
+	self.centerLat = settings.value("centerLat").toFloat()[0]
+	self.centerLon = settings.value("centerLon").toFloat()[0]
+	settings.endGroup()
+
+    # These are called from Javascript:
+    @pyqtSlot(result=float)
+    def getCenterLat(self):
+	return self.centerLat
+
+    @pyqtSlot(result=float)
+    def getCenterLon(self):
+	return self.centerLon
+
+    @pyqtSlot(result=int)
+    def getZoomLevel(self):
+	return self.zoomLevel
+
+    @pyqtSlot(int)
+    def zoomChanged(self, zoom):
+        #print "zoom Changed on map: %d" % (zoom)
+	self.parent.zoomLevel = zoom
+	self.saveSettings()
+
+    @pyqtSlot(float, float)
+    def centerChanged(self, lat, lon):
+        #print "center Changed on map %f, %f:" % (lat, lon)
+	self.parent.centerLat = lat
+	self.parent.centerLon = lon
+	self.saveSettings()
+
+
 
