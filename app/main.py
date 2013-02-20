@@ -11,29 +11,33 @@ import signal
 import dlg_sharing
 import dlg_server
 import dlg_origin
+import dlg_kml
 import client
-import server
+#import server
 import server_new
 import db
 import gmaps
 import gearth
-import settings
+from settings import *
 import flightradar24
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 from PyQt4.QtWebKit import *
 import yappi
+from kmlserver import *
 
 # Qt main window for the GUI
 class MainWindow(QMainWindow):
 	def __init__(self, reader, args):
 		QMainWindow.__init__(self)
 		self.reader = reader
+		self.readers = []		# testing multiple readers
 		self.server = None
 		self.client = None
+		self.kmlServer = None
 		self.args = args
-		self.settings = settings.globalSettings(self)
-		self.settings.save()
+		#self.settings = settings.settings(self)
+		#self.settings.save()
 		self.initUI()
 
 	def initUI(self):
@@ -41,7 +45,7 @@ class MainWindow(QMainWindow):
 		kmlAction = QAction(QIcon(), 'KML', self)
 		kmlAction.setShortcut('Ctrl+K')
 		kmlAction.setStatusTip('Generate KML for selected aircraft')
-		#kmlAction.triggered.connect(self.dumpKml)
+		kmlAction.triggered.connect(self.cfgKmlServer)
 		exitAction = QAction(QIcon(), 'Exit', self)
 		exitAction.setShortcut('Ctrl+Q')
 		exitAction.setStatusTip('Exit application')
@@ -62,7 +66,7 @@ class MainWindow(QMainWindow):
 		serverAction.setShortcut('Ctrl+S')
 		serverAction.setStatusTip('Run a client or server to connect to others')
 		#serverAction.triggered.connect(self.cfgServer)
-		serverAction.triggered.connect(self.cfgSharing)
+		serverAction.triggered.connect(self.cfgSharing2)
 		originAction = QAction(QIcon(), 'Set Origin ...', self)
 		originAction.setShortcut('Ctrl+O')
 		originAction.setStatusTip('Set the position of your antenna, so position decoding works')
@@ -82,7 +86,7 @@ class MainWindow(QMainWindow):
 		helpMenu.addAction(wikiAction)
 
 		# Toolbar actions
-		toolbar = self.addToolBar('Exit')
+		toolbar = self.addToolBar('Toolbar')
 		toolbar.addAction(exitAction)
 		toolbar.addAction(resizeAction)
 		toolbar.addAction(kmlAction)
@@ -174,21 +178,8 @@ class MainWindow(QMainWindow):
 		self.connect(self.dec, SIGNAL("updateStats(PyQt_PyObject)"), self.updateStats)
 
 
-		# create web-browser window
-		#webWindow = QWebView()
-		#webWindow.settings().setAttribute(QWebSettings.JavascriptEnabled, True)
-		##webfname = qApp.applicationDirPath() + "/map.html"
-		#webfname = "./map.html"
-		#if (QFile(webfname).exists() != True):
-			#print "HTML file %s not found" % (webfname)
-		##url = QUrl.fromLocalFile(webfname)
-		#url = QUrl.fromLocalFile("/Users/bk/src/openadsb/app/map.html")
-		##url = QUrl("http://www.google.com")
-		#print url
-		#webWindow.load(url)
-		#webWindow.show()
-
-		self.gmapsWindow = gmaps.gmaps()
+		# Google Maps window
+		self.gmapsWindow = gmaps.gmaps(self)
 		self.gmapsWindow.show()
 		self.t.connect(self.dec, SIGNAL("updateAircraftPosition(PyQt_PyObject)"), self.gmapsWindow.updateAircraftPosition)
 		self.t.connect(self.gmapsWindow, SIGNAL("highlightAircraft(int)"), self.t.highlightAircraft)
@@ -203,35 +194,32 @@ class MainWindow(QMainWindow):
 		# create log message textbox 
 		logmsg = QTextEdit()
 		self.t.connect(self.dec, SIGNAL("appendText(const QString&)"), logmsg.append)
+		self.t.connect(self.dec, SIGNAL("appendText(const QString&)"), self.logMsg)	# so we can print to console too
 		logmsg.document().setMaximumBlockCount(100)		# max lines in the log window - old lines deleted from top
 
 		# Create a layout
-		hbox = QHBoxLayout()
+		hbox = QHBoxLayout(self)
 		hbox.addWidget(QLabel("Show message types:  "))
-		hbox.addWidget(QCheckBox("DF0  "))
-		hbox.addWidget(QCheckBox("DF4  "))
-		hbox.addWidget(QCheckBox("DF5  "))
-		hbox.addWidget(QCheckBox("DF11  "))
-		hbox.addWidget(QCheckBox("DF17  "))
-		hbox.addWidget(QCheckBox("DF18  "))
-		hbox.addWidget(QCheckBox("DF20  "))
-		hbox.addWidget(QCheckBox("DF21  "))
+		self.logCheckboxes = [ 	QCheckBox("DF0  "), 
+					QCheckBox("DF4  "), 
+					QCheckBox("DF5  "), 
+					QCheckBox("DF11  "), 
+					QCheckBox("DF17  "), 
+					QCheckBox("DF18  "), 
+					QCheckBox("DF20  "), 
+					QCheckBox("DF21  ") ]
+		for b in self.logCheckboxes:
+			hbox.addWidget(b)
 		hbox.addStretch(1)
 		logheader = QWidget()
 		logheader.setLayout(hbox)
 
-		hsplit = QSplitter()
-		hsplit.addWidget(statsWindow)
-		hsplit.addWidget(self.gmapsWindow)
-		hsplit.addWidget(earthWindow)
-		#hbox2 = QHBoxLayout()
-		#hbox2.addWidget(statsWindow)
-		#hbox2.addWidget(webWindow)
-		#hbox2.addStretch(1)
-		#statsWebBox = QWidget()
-		#statsWebBox.setLayout(hbox2)
+		self.hsplit = QSplitter(self)
+		self.hsplit.addWidget(statsWindow)
+		self.hsplit.addWidget(self.gmapsWindow)
+		self.hsplit.addWidget(earthWindow)
 
-		vbox = QVBoxLayout()
+		vbox = QVBoxLayout(self)
 		vbox.setSpacing(0)
 		vbox.addWidget(logheader)
 		vbox.addWidget(logmsg)
@@ -239,21 +227,33 @@ class MainWindow(QMainWindow):
 		logbox.setLayout(vbox)
 		
 		# use a vertical splitter instead of vbox
-		vsplit = QSplitter()
-		vsplit.setOrientation(Qt.Vertical)
-		vsplit.addWidget(self.t)
-		#vsplit.addWidget(self.rxbar)
-		#vsplit.addWidget(statsWindow)
-		#vsplit.addWidget(statsWebBox)
-		vsplit.addWidget(hsplit)
-		vsplit.addWidget(logbox)
-		self.setCentralWidget(vsplit)
+		self.vsplit = QSplitter(self)
+		self.vsplit.setOrientation(Qt.Vertical)
+		self.vsplit.addWidget(self.t)
+		self.vsplit.addWidget(self.hsplit)
+		self.vsplit.addWidget(logbox)
+		self.setCentralWidget(self.vsplit)
 
 		self.statusBar().showMessage('Ready')
 		self.setGeometry(300, 300, 250 ,150)
 		self.setWindowTitle('OpenADSB Project')
 		self.show()
 		self.raise_()
+		
+		# load window geometry and state from previous settings (after show() so it works on linux)
+		settings = mySettings()
+		settings.beginGroup("mainWindow")
+		self.restoreGeometry(settings.value("geometry").toByteArray())
+		self.restoreState(settings.value("state").toByteArray())
+		self.hsplit.restoreState(settings.value("hsplitterState").toByteArray())
+		self.vsplit.restoreState(settings.value("vsplitterState").toByteArray())
+		settings.beginReadArray("logCheckboxes")
+		for idx, b in enumerate(self.logCheckboxes):
+			settings.setArrayIndex(idx)
+			b.setChecked(settings.value("checked").toBool())
+		settings.endArray()
+		
+		settings.endGroup()
 
 		# Create the database thread and connect its slots and signals
 		#self.dbThread = QThread()
@@ -270,6 +270,29 @@ class MainWindow(QMainWindow):
 		# control DAC automatically
 		if self.args.ditherdac:
 			self.ditherdac = DitherDAC(self)
+
+	# SLOT: Any text sent to this slot will print on the console
+	def logMsg(self, text):
+		if self.args.verbose:
+			print text
+
+	# override to save current settings on close
+	def closeEvent(self, event):
+		print "Saving settings"
+		settings = mySettings()
+
+		settings.beginGroup("mainWindow")
+		settings.setValue("geometry", self.saveGeometry())
+		settings.setValue("state", self.saveState())
+		settings.setValue("hsplitterState", self.hsplit.saveState())
+		settings.setValue("vsplitterState", self.vsplit.saveState())
+
+		settings.beginWriteArray("logCheckboxes")
+		for idx, b in enumerate(self.logCheckboxes):
+			settings.setArrayIndex(idx)
+			settings.setValue("checked", b.isChecked())
+		settings.endArray()
+		settings.endGroup()
 
 	def openWiki(self):
 		# open in browser
@@ -320,6 +343,84 @@ class MainWindow(QMainWindow):
 			#self.settings.sharing = s
 			#self.settings.save()
 			
+	# dialog box for configuring data sharing 
+	# testing new settings method
+	def cfgSharing2(self):
+		(accepted, groupName) = dlg_sharing.DlgConfigSharing.get(self)
+		if accepted:
+			s = mySettings()
+			s.beginGroup(groupName)
+			dlg_sharing.DlgConfigSharing.dumpSettings()
+
+			class ar():
+				host = ''
+				port = 0
+				origin = [ 0, 0 ]
+
+			# two-way data sharing with openadsb acting as a server
+			if self.server != None:
+				self.server.shutdown()
+				self.server = None
+			if s.value("enableServer").toBool():
+				self.server = server_new.ServerThread(	'', 
+									s.value('serverPort').toInt()[0], 
+									s.value('maxConn').toInt()[0], 
+									str(s.value('serverFormat').toString()))
+				self.server.start()
+				print "started server thread(s) on port %d" % (s.value("serverPort").toInt()[0])
+
+				# connect a reader to the incoming traffic
+				a = ar()
+				a.origin = [ 0, 0 ]
+				socketReader = reader.AdsbReaderThreadClientServer(a, self.server)
+				dec = socketReader.getDecoder()
+				self.connect(dec, SIGNAL("addAircraft(PyQt_PyObject)"), self.t.addAircraft)
+				self.connect(dec, SIGNAL("updateAircraft(PyQt_PyObject)"), self.t.updateAircraft)
+				self.connect(dec, SIGNAL("updateAircraftPosition(PyQt_PyObject)"), self.t.updateAircraftPosition)
+				self.connect(dec, SIGNAL("delAircraft()"), self.t.delAircraft)
+				self.readers.append(socketReader)
+				socketReader.start()
+
+			self.reader.setServer(self.server)
+
+			# two-way data sharing with openadsb acting as a client
+			if self.client != None:
+				self.client.shutdown()
+				self.client.join()
+				self.client = None
+
+			if s.value('enableClient').toBool():
+				#a = [ host = s.value('client').toString(), port = s.value('clientPort').toInt()[0] ]
+				a.host = s.value('client').toString()
+				a.port = s.value('clientPort').toInt()[0]
+				self.client = client.ClientThread(a.host, a.port)
+				self.client.start()
+				print "started client thread(s) for %s port %d" % (a.host, a.port)
+				r = reader.AdsbReaderThreadSocket(a)
+
+
+	# dialog for configuring the local KML server
+	def cfgKmlServer(self):
+		(accepted, groupName) = dlg_kml.DlgConfigKml.get(self)
+		if accepted:
+			s = mySettings()
+			s.beginGroup(groupName)
+			dlg_kml.DlgConfigKml.dumpSettings()
+
+			# two-way data sharing with openadsb acting as a server
+			if self.kmlServer != None:
+				self.kmlServer.shutdown()
+				self.kmlServer = None
+			if s.value("enableServer").toBool():
+				self.kmlServer = kmlServer(s.value('serverPort').toInt()[0])
+				self.kmlServer.start()
+				print "started KML HTTP server thread(s) on port %d" % (s.value("serverPort").toInt()[0])
+
+				self.connect(self.dec, SIGNAL("addAircraft(PyQt_PyObject)"), self.kmlServer.addAircraft)
+				self.connect(self.dec, SIGNAL("updateAircraft(PyQt_PyObject)"), self.kmlServer.updateAircraft)
+				self.connect(self.dec, SIGNAL("updateAircraftPosition(PyQt_PyObject)"), self.kmlServer.updateAircraftPosition)
+				#self.connect(self.dec, SIGNAL("updateAircraftFR24Info(PyQt_PyObject)"), self.kmlServer.updateAircraftFR24Info)
+				self.connect(self.dec, SIGNAL("delAircraft()"), self.kmlServer.delAircraft)
 
 	# bk - make new one - using server_new and client
 	def cfgServer(self, enable, port, maxConn, fmt):
@@ -456,9 +557,13 @@ def main():
 		en_gui = False
 	else:
 		en_gui = True
-	#en_gui = (notargs.nogui ? False : True)
+
 	app = QApplication(sys.argv, en_gui)
-	#if(not args.nogui):
+	app.setOrganizationDomain("openadsb.com")
+	app.setOrganizationName("OpenADSB")
+	app.setApplicationName("OpenADSBApp")
+	app.setApplicationVersion("0.1.0")
+
 	if en_gui:
 		m = MainWindow(r, args)
 	r.start()
