@@ -5,7 +5,7 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 from PyQt4.QtWebKit import *
 import sys
-from settings_new import *
+from settings import *
 
 
 js = """
