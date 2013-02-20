@@ -27,6 +27,9 @@ class ClientThread(threading.Thread):
 		self.terminate_flag = threading.Event()
 		self.waitForConnect = waitForConnect
 		self.sock = None
+		self.deviceName = ''
+		self.friendlyName = ''
+		self.location = [ 0, 0, 0 ]
 		if self.waitForConnect:
 			self.connect()
 
@@ -35,7 +38,9 @@ class ClientThread(threading.Thread):
 		try:
 			self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 			self.sock.connect((self.host, self.port))
-			self.sock.send("Hello from OpenADSB\n")
+			self.sock.send("HELLO\n")
+			self.sock.send("DEVICE" + self.deviceName + '\n')
+			self.sock.send("LOCATION" + str(self.location)  + '\n')
 			#self.sockfile = self.sock.makefile('r', 0)		# create a file-object to read from w/o buffering
 			print self.sock.getsockname(), ' connected!'
 			return True
@@ -45,6 +50,7 @@ class ClientThread(threading.Thread):
 		
 	# in this thread, we send queued outgoing traffic only
 	def run(self):
+		# fixme - add new variable "autoreconnect", and if set loop here, attempting reconnection forever
 		if not self.waitForConnect:
 			self.connect()
 
@@ -88,6 +94,14 @@ class ClientThread(threading.Thread):
 			print "socket was closed"
 		return d
 
+	def setDeviceName(self, name):
+		self.deviceName = name
+
+	def setFriendlyName(self, name):
+		self.friendlyName = name
+
+	def setLocation(self, loc):
+		self.location = loc
 
 # test this client if run directly 
 if __name__ == '__main__':
