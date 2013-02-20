@@ -9,7 +9,6 @@ import time, math
 import binascii
 import argparse
 import Queue
-#import threading
 from PyQt4.QtCore import *
 import decoder
 import yappi
@@ -58,6 +57,7 @@ class AdsbReaderThread(QThread):
 		mystr += "%02hx " % byte
 	print "%s: %u byte packet: %s" % (ts, len(d), mystr)
 
+    # We push received packets out to this server
     def setServer(self, server):
 	self.server = server
 
@@ -179,6 +179,54 @@ class AdsbReaderThreadSocket(AdsbReaderThread):
 	return b
 
 
+# This class interfaces to a multithreaded client and/or server, to read incoming packets
+class AdsbReaderThreadClientServer(AdsbReaderThread):
+
+    def __init__(self, args, clientserver):
+	AdsbReaderThread.__init__(self, args)
+	self.clientserver = clientserver		# client or server
+ 
+    def read(self):
+	ls = 0
+	pktCnt = 0
+	starttime = time.time()
+	while not self.kill_received:
+
+		pkt = self.clientserver.get()		# get packet from queue, in form of a string
+		print "Got pkt!", type(pkt), pkt
+		pktlist = pkt.split("\n")		# network packet may contain a number ADSB packets
+		print "pktlist: ", type(pktlist), len(pktlist)
+
+		for d in pktlist:
+			print "pkt: ", type(d), len(d)
+			if len(d) > 4:
+				pktCnt = pktCnt + 1
+
+				# extract fields
+				s = d.strip().split()
+				(ts, nbytes) = (s[0], s[1])
+				d = ""
+				d = d.join(s[2:]).strip()
+				#print "new d =", type(d), d
+				try:
+					d = binascii.unhexlify(d)		# hex string to binary
+					#self.dumpPacket(d)
+					#self.servePacket(d)			# fixme - we don't want to serve back to ourself, right?
+					self.decoder.decode(d)
+					#self.decoder.updateStats(rxlevel, self.bad_short_pkts, self.bad_long_pkts, self.logfileSize())
+				except:
+					print "got exception"
+					pass
+			ls += len(d)
+
+		self.clientserver._free()			# discard memory used by packet
+
+    def run(self):
+	# Don't return until the we're killed
+	print "Reading packets from network..."
+	b = self.read()
+
+
 # We want to read from the USB port at the highest possible rate, to avoid stalling the receiver. 
 # Spawn a high-priority thread to actually read from the port, and enqueue the packets for processing
 class UsbServiceThread(QThread):
@@ -198,6 +246,8 @@ class UsbServiceThread(QThread):
 			except:
 				# device might have been removed
 				# terminate thread
+				# FIXME - we should somehow wake our parent waiting on the queue, then tell it to break
+				# and release the port handle.  Then return to the main loop looking for another usb device to open
 				break
 
 			#if pktCnt % 10 == 0:
@@ -263,6 +313,11 @@ class AdsbReaderThreadUSB(AdsbReaderThread):
 	print "Logging received packets to file %s" % (packetlog_fname)
 	self.PACKETLOG = open(packetlog_fname, "a")		# append to log
 
+	# FIXME - treat this like a server.  For each device found, spawn a new thread to service it.
+	# That thread terminates when the device is removed.  New devices are picked up automatically
+
+	#while not self.kill_received:
+		# how to wake when new usb device inserted?
 	# Open the USB device. deal with multiple devices.  pick the first available
 	print "Opening USB device..."
 	dev_list = usb.core.find(idVendor=0x9999, idProduct=0xffff, find_all=True)
@@ -297,7 +352,7 @@ class AdsbReaderThreadUSB(AdsbReaderThread):
 
 	# kill USB service thread
 	self.usbThread.kill_received = True
-	self.usbThread.join()
+	self.usbThread.wait()
 
 	#yappi.print_stats(sys.stdout, yappi.SORTTYPE_TTOTAL)
 	yappi.print_stats()
