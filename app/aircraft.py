@@ -59,6 +59,7 @@ class Aircraft(QObject):
 		self.ccStr = ""
 		self.riStr = ""
 		self.fsStr = ""
+		self.emergStr = ""
 		self.acasStr = ""
 		self.iis = 0				# interrogator identity subfield 
 		self.alt = 0
@@ -72,6 +73,7 @@ class Aircraft(QObject):
 		self.bearingStr = ""
 		self.heading = 0
 		self.headingStr = ""
+		self.fakeICAO24 = False
 		self.pkts = 1
 		self.timestamp = time.time()
 		self.countryStr = decoder.lookupCountry(aa)
@@ -231,6 +233,16 @@ class Aircraft(QObject):
 		self.fsStr = fsStr
 		self.drStr = drStr
 		self.timestamp = time.time()
+
+	def setEmergStatus(self, squawk, esStr):
+		self.pkts += 1
+		self.squawk = squawk;
+		self.squawkStr = ("%04u" % squawk)
+		self.emergStr = esStr
+		self.timestamp = time.time()
+		
+	def setFakeICAO24(self, state):
+		self.fakeICAO24 = state
 
 	def dumpTrack(self):
 		if self.idStr != "":
