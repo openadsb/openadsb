@@ -13,8 +13,7 @@ import dlg_server
 import dlg_origin
 import dlg_kml
 import client
-#import server
-import server
+from server import *
 import db
 import gmaps
 import gearth
@@ -299,49 +298,6 @@ class MainWindow(QMainWindow):
 		OPENADSB_WIKI_URL = "http://www.openadsb.com/wiki"
 		QDesktopServices.openUrl(QUrl(OPENADSB_WIKI_URL, QUrl.TolerantMode))
 
-	# bk - make new one - using server_new and client
-	def cfgSharing(self):
-		# FIXME - read these defaults from our application settings
-		args = dict()
-		args['enableClient'] = True
-		args['enableServer'] = True
-		args['client'] = "1.2.3.4"
-		args['clientPort'] = 57575
-		args['serverPort'] = 56565
-		args['maxConn'] = 5
-		args['formats'] = ["PlanePlotter", "AVR", "OpenADSB v1 ASCII"]
-		args['clientFormat'] = args['formats'][2]
-		args['serverFormat'] = args['formats'][0]
-		(accepted, args) = dlg_sharing.DlgConfigSharing.get(args)
-		#(accepted, s) = dlg_sharing.DlgConfigSharing.get(self.settings.sharing)
-		if accepted:
-			if self.server != None:
-				self.server.shutdown()
-				self.server = None
-			if args['enableServer']:
-				#self.server = server_new.ServerThread('', s.serverPort, s.maxConn, s.serverFormat)
-				self.server = server_new.ServerThread('', args['serverPort'], args['maxConn'], args['serverFormat'])
-				self.server.start()
-				print "started server thread(s) on port %d" % (args['serverPort'])
-			self.reader.setServer(self.server)
-
-			if self.client != None:
-				self.client.shutdown()
-				self.client.join()
-				self.client = None
-
-			if args['enableClient']:
-				self.client = client.ClientThread(args['client'], args['clientPort'])
-				self.client.start()
-				print "started client thread(s) for %s port %d" % (args['client'], args['clientPort'])
-				# fixme - need to instantiate a new reader
-				a = {}
-				a.host = args['client']
-				a.port = args['clientPort']
-				r = reader.AdsbReaderThreadSocket(a)
-
-			#self.settings.sharing = s
-			#self.settings.save()
 			
 	# dialog box for configuring data sharing 
 	# testing new settings method
@@ -362,7 +318,7 @@ class MainWindow(QMainWindow):
 				self.server.shutdown()
 				self.server = None
 			if s.value("enableServer").toBool():
-				self.server = server_new.ServerThread(	'', 
+				self.server = ServerThread(	'', 
 									s.value('serverPort').toInt()[0], 
 									s.value('maxConn').toInt()[0], 
 									str(s.value('serverFormat').toString()))
@@ -422,7 +378,7 @@ class MainWindow(QMainWindow):
 				#self.connect(self.dec, SIGNAL("updateAircraftFR24Info(PyQt_PyObject)"), self.kmlServer.updateAircraftFR24Info)
 				self.connect(self.dec, SIGNAL("delAircraft()"), self.kmlServer.delAircraft)
 
-	# bk - make new one - using server_new and client
+	# bk - make new one - using server and client
 	def cfgServer(self, enable, port, maxConn, fmt):
 		(accepted, enable, port, maxConn, fmt) = dlg_server.DlgConfigServer.get(self.server != None)
 		if accepted:
