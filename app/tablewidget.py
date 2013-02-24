@@ -7,6 +7,7 @@ import sys
 import time
 import aircraft
 import flightradar24
+from settings import *
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
@@ -52,7 +53,31 @@ class MyTableWidget(QTableWidget):
 	self.lastSortCol = 0
 	self.lastSortOrder = Qt.AscendingOrder
 	self.connect(self.horizontalHeader(), SIGNAL("sectionClicked(int)"), self.sortCol)
+
+	# enable draggable columns
+	# note, column numbers seem to be the same, even after moving them
+	self.setDragDropOverwriteMode(True)
+	self.setDragEnabled(True)
+	self.setDragDropMode(QAbstractItemView.InternalMove)
+	self.setSelectionBehavior(QAbstractItemView.SelectRows)
+	self.horizontalHeader().setMovable(True)
+	self.verticalHeader().setMovable(True)
         
+	# load window geometry and state from previous settings 
+	settings = mySettings()
+	settings.beginGroup("aircraftTable")
+	self.restoreGeometry(settings.value("geometry").toByteArray())
+	self.horizontalHeader().restoreState(settings.value("header").toByteArray())
+	settings.endGroup()
+
+
+    def saveSettings(self):
+	settings = mySettings()
+	settings.beginGroup("aircraftTable")
+	settings.setValue("geometry", self.saveGeometry())
+	settings.setValue("header", self.horizontalHeader().saveState())
+	settings.endGroup()
+
     # we want resizeColumnnsToContents() to consider all rows, not just the visible ones
     def resize(self):
     	#self.setVisible(False)		# this is a hack - causes weirdness...
@@ -159,6 +184,7 @@ class MyTableWidget(QTableWidget):
 	else:
 		order = Qt.AscendingOrder
 	self.doSort(col, order)
+	self.saveSettings()
 
     def doSort(self, col, order):
 	print "sort on col ",col
