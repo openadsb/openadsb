@@ -111,9 +111,9 @@ class gmaps(QWebView):
 		# BK - it seems like the page we load here doesn't get its javascript evaluated until AFTER we return from this function.
 		# That's good - we can add all our Python functions so they can be called immediately when the page is loaded
 		QWebView.__init__(self, parent)
-		self.centerLat = 0
-		self.centerLon = 0
-		self.zoomLevel = 0
+		#self.centerLat = 0
+		#self.centerLon = 0
+		#self.zoomLevel = 0
 		#self.setPage(QWebPage())
 		self.setPage(WebPage())
 		self.settings().setAttribute(QWebSettings.JavascriptEnabled, True)
@@ -189,9 +189,9 @@ class mapSettings(QObject):
     def saveSettings(self):
 	settings = mySettings()
 	settings.beginGroup("googleMaps")
-	settings.setValue("zoomLevel", self.parent.zoomLevel)
-	settings.setValue("centerLat", self.parent.centerLat)
-	settings.setValue("centerLon", self.parent.centerLon)
+	settings.setValue("zoomLevel", self.zoomLevel)
+	settings.setValue("centerLat", self.centerLat)
+	settings.setValue("centerLon", self.centerLon)
 	settings.endGroup()
 
     def getSettings(self):
@@ -218,14 +218,14 @@ class mapSettings(QObject):
     @pyqtSlot(int)
     def zoomChanged(self, zoom):
         #print "zoom Changed on map: %d" % (zoom)
-	self.parent.zoomLevel = zoom
+	self.zoomLevel = zoom
 	self.saveSettings()
 
     @pyqtSlot(float, float)
     def centerChanged(self, lat, lon):
         #print "center Changed on map %f, %f:" % (lat, lon)
-	self.parent.centerLat = lat
-	self.parent.centerLon = lon
+	self.centerLat = lat
+	self.centerLon = lon
 	self.saveSettings()
 
 
