@@ -212,8 +212,14 @@ class AircraftDb(QObject):
 	# perform database lookup and emit signal with database info
 	def addAircraft(self, ac):
 		i = AircraftDbInfo(ac.aa)
-		aa = "%X"%ac.aa
-		#print "AircraftDb() addAircraft called for %s" % aa
+		aa = "%X"%ac.aa	
+		if ac.fakeICAO24:
+			i.registrationStr = "N/A"
+			i.typeStr = "Non-ICAO24"
+			i.ownerStr = "N/A"
+			self.emit(SIGNAL("updateAircraftDbInfo(PyQt_PyObject)"), i)
+			return
+
 		[ ok, i.registrationStr, i.ownerStr, i.ownerCityStr, i.ownerStateStr, i.ownerCountryStr, accode, ecode, i.yearBuilt ] = self.lookupAircraftByICAO24(aa)
 		if ok:
 			[ i.acMfgStr, i.acModelStr, i.acTypeStr, i.numEng, i.engTypeStr, i.numSeats ] = self.lookupModelByMfgCode(accode)
