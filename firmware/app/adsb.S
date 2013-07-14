@@ -96,6 +96,7 @@
 ; expects TCC0 to be running, and OVFIF flag to be clear upon entry.
 ; Returns 0 if TCCO overflows (timeout)
 ; Returns (number of bytes) >1 if packet received (fixme - need bitfield for packet type also?)
+; FIXME - allow multiple packets (each prefixed with byte count?) until buffer full
 
 .section .text
 .global decode_adsb
@@ -113,6 +114,7 @@ try_again:
 	ldi 	r27,hi8(adsb_buf)		; buffer address in X ptr
 	ldi 	r26,lo8(adsb_buf)
 	adiw	r26,8				; advance 8 bytes to skip header area
+look_for_more:
 	ldi 	r25,EXT_SQUITTER+1		; As DEC and BREQ is done at first Manchester bit, need +1
 	;ldi 	r25,7+1		; As DEC and BREQ is done at first Manchester bit, need +1
 	rjmp	edge_det
@@ -127,6 +129,7 @@ ret_timeout:
 	pop	r17
 	pop	r16
 	ldi	r24,0				; zero means timeout - no bytes received
+						; FIXME - don't return zero, return total byte count
 	ret
 
 ;--------------------------------------------------------
@@ -450,6 +453,7 @@ mdecode_errex:						; Extend error jump for 2nd manchester (Flag test will be sa
 ;--------------------------------------------------------
 ; Error during Manchester Decode Loop
 ;--------------------------------------------------------
+; FIXME - don't return, rather reset pointer and jump to look_for_more
 mdecode_error:
 	; r25 bytes to go counter > 7 means bad short pkt
 	; r25 bytes to go counter < 7 means bad long pkt
@@ -477,10 +481,12 @@ incr_ctr:
 
 
 ;--------------------------------------------------------
+; Successful packet
+;--------------------------------------------------------
+; FIXME - instead of returning, check if we have buffer space for another
+; long squitter.  if not, return total number of bytes (keep in register)
+; if so, jump back to look_for_more
 
-;--------------------------------------------------------
-; Error during Manchester Decode Loop
-;--------------------------------------------------------
 short_squitter_done:
 	pop	r27
 	pop	r26
