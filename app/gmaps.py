@@ -138,7 +138,7 @@ class gmaps(QWebView):
 	# SLOTS
 	def updateAircraftPosition(self, ac):
 		l = len(ac.track)
-		if l > 2:
+		if l > 1:
 			end = ac.track[l-1]
 			[ lon, lat, alt, head ] = end
 			s = "plotTrack(%s, %f, %f, %f);" % (ac.aa, lat, lon, alt)

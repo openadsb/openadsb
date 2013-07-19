@@ -50,7 +50,7 @@ class Aircraft(QObject):
 		self.caStr = ""
 		self.catStr = ""
 		self.posStr = ""
-		self.moveStr = ""
+		#self.moveStr = ""
 		self.altStr = ""
 		self.posUncertStr = ""
 		self.altTypeStr = ""
@@ -141,15 +141,18 @@ class Aircraft(QObject):
 		self.catStr = catStr
 		self.timestamp = time.time()
 
-	def setGroundPos(self, posStr, moveStr, caStr):
+	#def setGroundPos(self, posStr, moveStr, caStr):
+	def setGroundPos(self, lat, lon, velStr, caStr):
 		self.pkts += 1
-		if posStr != "":
-			self.posStr = posStr
-		self.moveStr = moveStr
+		self.posStr = self.formatPos(lat, lon)
+		self.velStr = velStr
 		self.caStr = caStr
 		self.fsStr = "On Ground"
+		self.vertStr = ""
+		self.headingStr = ""
 		self.timestamp = time.time()
-		self.pos_timestamp = self.timestamp = time.time()
+		self.pos_timestamp = self.timestamp = t = time.time()
+		self.track += [(lon, lat, self.alt, t)]		# fixme - alt might not be valid yet
 
 	def setAirbornePos(self, lat, lon, alt, posUncertStr, altTypeStr, caStr):
 		self.pkts += 1

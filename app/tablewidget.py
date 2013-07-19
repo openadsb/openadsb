@@ -206,7 +206,7 @@ class AdsbTableWidget(MyTableWidget):
 
 	def __init__(self, mainWindow):
 		hdrs = [	'Plot', 'Time', 'ICAO24', 'Country', 'Flight ID', 'Status', 'Range', 'Elevation', 
-				'Azimuth', 'Position', 'Altitude', 'Vertical rate', 'Heading', 'Airspeed', 
+				'Azimuth', 'Position', 'Altitude', 'Vertical rate', 'Heading', 'Speed', 
 				#'Ground speed', 'Squawk', 'Category', 'Max speed', 'Packets', 'Track Points', 'Tail Number', 'Type', 'Kind', 'Owner' ]
 				'Ground speed', 'Squawk', 'Category', 'Max speed', 'Packets', 'Track Points', 'Tail Number', 'Type', 'Kind', 'Owner', 'From/To' ]
 		MyTableWidget.__init__(self, hdrs, mainWindow)

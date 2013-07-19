@@ -460,14 +460,14 @@ class AdsbDecoder(QObject):
 			cprlong = me[39:56].uint
 			[lat, lon] = self.decodeCPR(cprlong, cprlat, 17, 90, oddeven)
 			posStr = "at (%f, %f)" % (lat, lon)
-			moveStr = self.decodeMovement(movement)
+			[vel, velStr] = self.decodeMovement(movement)
 			if crcgood:
 				# store aa, ONGROUND, posStr, moveStr
 				a = self.lookupAircraft(aa)
 				if a == None:
 					a = self.recordAircraft(aa)
-				a.setGroundPos(posStr, moveStr, caStr)
-				logStr = "%s CPR: %u, %u %s. %s." % ("Odd" if oddeven else "Even", cprlat, cprlong, posStr, moveStr)
+				a.setGroundPos(lat, lon, velStr, caStr)
+				logStr = "%s CPR: %u, %u %s. %s." % ("Odd" if oddeven else "Even", cprlat, cprlong, posStr, velStr)
 				self.emit(SIGNAL("updateAircraftPosition(PyQt_PyObject)"), a)
 			
 		elif tc >=9 and tc <=22 and tc != 19:	
@@ -1076,25 +1076,35 @@ class AdsbDecoder(QObject):
 		# refer to A.2.3.3.1
 		if m == 0:
 			str = "Ground speed unavailable"
+			vel = -1
 		elif m == 1:
+			vel = 0
 			str = "Aircraft stopped"
 		elif m >= 2 and m <= 8:
-			str = "Ground speed %f kts" % ((m-2)*0.125 + 0.125)
+			vel = (m-2)*0.125 + 0.125
+			str = "Ground speed %.1f kts" % (vel)
 		elif m >= 9 and m <= 12:
-			str = "Ground speed %f kts" % ((m-9)*0.25 + 1.0)
+			vel = (m-9)*0.25 + 1.0
+			str = "Ground speed %.1f kts" % (vel)
 		elif m >= 13 and m <= 38:
-			str = "Ground speed %f kts" % ((m-13)*0.5 + 2.0)
+			vel = (m-13)*0.5 + 2.0
+			str = "Ground speed %.1f kts" % (vel)
 		elif m >= 39 and m <= 93:
-			str = "Ground speed %f kts" % ((m-39)*1.0 + 15.0)
+			vel = (m-39)*1.0 + 15.0
+			str = "Ground speed %.1f kts" % (vel)
 		elif m >= 94 and m <= 108:
-			str = "Ground speed %f kts" % ((m-94)*2.0 + 70.0)
+			vel = (m-94)*2.0 + 70.0
+			str = "Ground speed %.1f kts" % (vel)
 		elif m >= 109 and m <= 123:
-			str = "Ground speed %f kts" % ((m-109)*5.0 + 100.0)
+			vel = (m-109)*5.0 + 100.0
+			str = "Ground speed %.1f kts" % (vel)
 		elif m == 124:
+			vel = 176
 			str = "Ground speed > 175 kts"
 		else:
+			vel = -1
 			str = "Ground speed reserved field"
-		return str
+		return [vel, str]
 
 	# compact position record decoding
 	# Nb = 17 for airborne, 14 for intent, and 12 for TIS-B
