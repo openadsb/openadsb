@@ -15,4 +15,4 @@ is given in the source files, where appropriate.
 For questions or comments, please contact:
 info@openadsb.com
 
-![screenshot](openadsb/wiki/openadsb_screenshot1.jpg)
+![screenshot](app/openadsb_screenshot1.jpg)
