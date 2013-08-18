@@ -47,6 +47,8 @@ class Aircraft(QObject):
 		self.decoder = decoder
 		self.aa = aa
 		self.idStr = ""
+		self.airlineStr = ""
+		self.callsignStr = ""
 		self.caStr = ""
 		self.catStr = ""
 		self.posStr = ""
@@ -137,11 +139,12 @@ class Aircraft(QObject):
 
 	def setIdentityInfo(self, idStr, catStr):
 		self.pkts += 1
-		self.idStr = idStr
+		if self.idStr != idStr:
+			self.idStr = idStr
+			(self.airlineStr, self.callsignStr) = self.lookupAirlineByFlightID(idStr)
 		self.catStr = catStr
 		self.timestamp = time.time()
 
-	#def setGroundPos(self, posStr, moveStr, caStr):
 	def setGroundPos(self, lat, lon, velStr, caStr):
 		self.pkts += 1
 		self.posStr = self.formatPos(lat, lon)
@@ -296,4 +299,7 @@ class Aircraft(QObject):
 			(age, self.countryStr, self.aa, self.idStr, self.fsStr, self.range, self.posStr, self.posUncertStr, self.alt, \
 			self.altTypeStr, self.vertStr, self.heading, self.velStr, self.squawk, self.catStr, self.caStr)
 
-		
+	def lookupAirlineByFlightID(self, idStr):
+		(airline, country, callsign) = self.decoder.reader.app.airlineCodes.lookupByFlightID(idStr)
+		print airline, callsign
+		return [ airline, callsign ]
