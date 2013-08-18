@@ -45,6 +45,8 @@ class SocketHandler(SocketServer.BaseRequestHandler):
 	self.incomingThread.start()
 	self.connected = True
 
+	# fixme - emit deviceAdded()
+
     # we will handle outgoing traffic in this thread only
     def handle(self):
 	if not self.connected:
@@ -61,6 +63,7 @@ class SocketHandler(SocketServer.BaseRequestHandler):
     def finish(self):
         print "Client", self.client_address, 'disconnected!'
 	if self.connected:
+		# fixme - emit deviceRemoved()
 		self.server.myThread.delClientQueue(self.outgoing_q)
 		self.incomingThread.terminate()
 		self.incomingThread.join()

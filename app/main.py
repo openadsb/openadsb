@@ -24,19 +24,90 @@ from PyQt4.QtGui import *
 from PyQt4.QtWebKit import *
 import yappi
 from kmlserver import *
+import feeds
+import airline_codes
+
+class ar():
+	host = ''
+	port = 0
+	origin = [ 0, 0 ]
+
+# to support non-gui operation, use a subclassed QApplication as the main class rather than QMainWindow 
+class MyApplication(QApplication):
+	def __init__(self, args, parsedargs, en_gui = True):
+		QApplication.__init__(self, args, en_gui)
+		self.args = parsedargs
+		self.en_gui = en_gui
+		self.readers = []
+		self.setOrganizationDomain("openadsb.com")
+		self.setOrganizationName("OpenADSB")
+		self.setApplicationName("OpenADSBApp")
+		self.setApplicationVersion("0.1.0")
+		self.dbThread = db.AircraftDbThread() 		# Create the database thread 
+		self.fr24Thread = flightradar24.fr24Thread() 	# Create thread to query flightradar24.com
+		self.airlineCodes = airline_codes.airlineCodes()	# only need one of these per app
+
+		if en_gui:
+			self.mainWindow = MainWindow(self)
+		else:
+			self.mainWindow = None
+
+		# control DAC automatically
+		if self.args.ditherdac:
+			self.ditherdac = DitherDAC(self.mainWindow)		# fixme - make it work w/o gui too
+
+		# USB data source
+		self.usbHotplugThread = reader.UsbHotplugWatcher(self)
+		self.connect(self.usbHotplugThread, SIGNAL("addReader(PyQt_PyObject)"), self.addReader)
+		self.usbHotplugThread.start()
+
+		# Network data source
+		if self.args.host != None:
+			h = self.args.host.split(':')
+			a = ar()
+			a.origin = [ 0, 0 ]
+			a.host = h[0]
+			a.port = int(h[1])
+			# fixme - use new ClientThread instead...
+			# thread should run in the background and attempt to (re)connect to server indefinitely. add reader should be done by that thread ,not here
+			#self.client = client.ClientThread(a.host, a.port)
+			#self.client.start()
+			#print "started client thread(s) for %s port %d" % (a.host, a.port)
+			r = reader.AdsbReaderThreadSocket(a, self)
+			self.addReader(r)
+
+	def addReader(self, reader):
+		print "MyApplication::addReader called"
+		print reader
+
+		# connect the signals from the reader/parser to the slots
+		dec = reader.getDecoder()
+		self.connect(dec, SIGNAL("appendText(const QString&)"), self.logMsg)	# so we can print to console too
+		self.connect(dec, SIGNAL("addAircraft(PyQt_PyObject)"), self.dbThread.db.addAircraft)
+		self.connect(dec, SIGNAL("addAircraft(PyQt_PyObject)"), self.fr24Thread.addAircraft)
+
+		# some signals are only used with gui
+		if self.mainWindow:
+			self.mainWindow.addReader(reader)
+
+		self.readers.append(reader)
+		reader.start()
+
+	# SLOT: Any text sent to this slot will print on the console
+	def logMsg(self, text):
+		if self.args.verbose:
+			print text
+
+
 
 # Qt main window for the GUI
 class MainWindow(QMainWindow):
-	def __init__(self, reader, args):
-		QMainWindow.__init__(self)
-		self.reader = reader
-		self.readers = []		# testing multiple readers
+	def __init__(self, app):
+		QMainWindow.__init__(self )
+		self.app = app
 		self.server = None
 		self.client = None
 		self.kmlServer = None
-		self.args = args
-		#self.settings = settings.settings(self)
-		#self.settings.save()
 		self.initUI()
 
 	def initUI(self):
@@ -96,13 +167,6 @@ class MainWindow(QMainWindow):
 		self.t.show()
 		resizeAction.triggered.connect(self.t.resizeColumnsToContents)
 
-		# connect the signals from the reader/parser to the slots in tablewidget
-		self.dec = self.reader.getDecoder()
-		self.t.connect(self.dec, SIGNAL("addAircraft(PyQt_PyObject)"), self.t.addAircraft)
-		self.t.connect(self.dec, SIGNAL("updateAircraft(PyQt_PyObject)"), self.t.updateAircraft)
-		self.t.connect(self.dec, SIGNAL("updateAircraftPosition(PyQt_PyObject)"), self.t.updateAircraftPosition)
-		self.t.connect(self.dec, SIGNAL("delAircraft()"), self.t.delAircraft)
-		
 		# Create a progress bar to show the current RX level
 		#self.rxbar = QProgressBar()
 		#self.rxbar.setRange(0, 4096)
@@ -113,8 +177,7 @@ class MainWindow(QMainWindow):
 		self.daclevel = QSpinBox()
 		self.daclevel.setMinimum(0)
 		self.daclevel.setMaximum(4095)
-		self.daclevel.setValue(self.args.daclevel)
-		self.daclevel.connect(self.daclevel, SIGNAL("valueChanged(int)"), self.reader.setDAC)
+		self.daclevel.setValue(self.app.args.daclevel)
 
 		# create a set of labels for statistics
 		# Add labels to grid
@@ -173,31 +236,25 @@ class MainWindow(QMainWindow):
 		grid.addWidget(self.DFOther, 16, 1)
 		statsWindow = QWidget()
 		statsWindow.setLayout(grid)
-		#self.connect(self.dec, SIGNAL("updateStats(int, int, int, int)"), self.updateStats)
-		self.connect(self.dec, SIGNAL("updateStats(PyQt_PyObject)"), self.updateStats)
-
 
 		# Google Maps window
 		self.gmapsWindow = gmaps.gmaps(self)
 		self.gmapsWindow.show()
-		self.t.connect(self.dec, SIGNAL("updateAircraftPosition(PyQt_PyObject)"), self.gmapsWindow.updateAircraftPosition)
+		#self.t.connect(self.dec, SIGNAL("updateAircraftPosition(PyQt_PyObject)"), self.gmapsWindow.updateAircraftPosition)
 		self.t.connect(self.gmapsWindow, SIGNAL("highlightAircraft(int)"), self.t.highlightAircraft)
 		self.t.connect(self.gmapsWindow, SIGNAL("unhighlightAircraft(int)"), self.t.unhighlightAircraft)
 		
 		# fixme - Google Earth plugin doesn't work yet
 		earthWindow = gearth.gearth()
 		earthWindow.show()
-		#self.t.connect(self.dec, SIGNAL("updateAircraft(PyQt_PyObject)"), earthWindow.updateAircraft)
-		
 
 		# create log message textbox 
-		logmsg = QTextEdit()
-		self.t.connect(self.dec, SIGNAL("appendText(const QString&)"), logmsg.append)
-		self.t.connect(self.dec, SIGNAL("appendText(const QString&)"), self.logMsg)	# so we can print to console too
-		logmsg.document().setMaximumBlockCount(100)		# max lines in the log window - old lines deleted from top
+		self.logmsg = QTextEdit()
+		self.logmsg.document().setMaximumBlockCount(100)		# max lines in the log window - old lines deleted from top
 
 		# Create a layout
-		hbox = QHBoxLayout(self)
+		#hbox = QHBoxLayout(self)
+		hbox = QHBoxLayout()
 		hbox.addWidget(QLabel("Show message types:  "))
 		self.logCheckboxes = [ 	QCheckBox("DF0  "), 
 					QCheckBox("DF4  "), 
@@ -218,10 +275,19 @@ class MainWindow(QMainWindow):
 		self.hsplit.addWidget(self.gmapsWindow)
 		self.hsplit.addWidget(earthWindow)
 
-		vbox = QVBoxLayout(self)
+		# Data feeds is a tableWidget
+		self.feedsWidget = feeds.AdsbFeedsWidget(self)
+
+		# create tabbed window on bottom
+		tabWidget = QTabWidget(self)
+		tabWidget.addTab(self.logmsg, "Received Packets")
+		tabWidget.addTab(self.feedsWidget, "Receivers")
+
+		#vbox = QVBoxLayout(self)
+		vbox = QVBoxLayout()
 		vbox.setSpacing(0)
 		vbox.addWidget(logheader)
-		vbox.addWidget(logmsg)
+		vbox.addWidget(tabWidget)
 		logbox = QWidget()
 		logbox.setLayout(vbox)
 		
@@ -251,29 +317,33 @@ class MainWindow(QMainWindow):
 			settings.setArrayIndex(idx)
 			b.setChecked(settings.value("checked").toBool())
 		settings.endArray()
-		
 		settings.endGroup()
 
-		# Create the database thread and connect its slots and signals
-		#self.dbThread = QThread()
-		#self.dbWorker = db.AircraftDbWorker(self.dbThread)
-		self.dbThread = db.AircraftDbThread()
-		self.connect(self.dec, SIGNAL("addAircraft(PyQt_PyObject)"), self.dbThread.db.addAircraft)
-		self.connect(self.dbThread.db, SIGNAL("updateAircraftDbInfo(PyQt_PyObject)"), self.t.updateAircraftDbInfo)
+		# connect database thread and flightradar24 lookup thread to the tablewidget
+		self.connect(self.app.dbThread.db, SIGNAL("updateAircraftDbInfo(PyQt_PyObject)"), self.t.updateAircraftDbInfo)
+		self.connect(self.app.fr24Thread, SIGNAL("updateAircraftFR24Info(PyQt_PyObject)"), self.t.updateAircraftFR24Info)
 
-		# Create thread to query flightradar24.com
-		self.fr24Thread = flightradar24.fr24Thread()
-		self.connect(self.dec, SIGNAL("addAircraft(PyQt_PyObject)"), self.fr24Thread.addAircraft)
-		self.connect(self.fr24Thread, SIGNAL("updateAircraftFR24Info(PyQt_PyObject)"), self.t.updateAircraftFR24Info)
+	# connect gui signals for this new reader
+	def addReader(self, reader):
+		print type(reader)
+		# connect the signals from the reader/parser to the slots
+		dec = reader.getDecoder()
+		self.connect(dec, SIGNAL("addAircraft(PyQt_PyObject)"), self.t.addAircraft)
+		self.connect(dec, SIGNAL("updateAircraft(PyQt_PyObject)"), self.t.updateAircraft)
+		self.connect(dec, SIGNAL("updateAircraftPosition(PyQt_PyObject)"), self.t.updateAircraftPosition)
+		self.connect(dec, SIGNAL("delAircraft()"), self.t.delAircraft)
+		self.connect(dec, SIGNAL("updateStats(PyQt_PyObject)"), self.updateStats)
+		self.connect(dec, SIGNAL("updateAircraftPosition(PyQt_PyObject)"), self.gmapsWindow.updateAircraftPosition)
+		self.connect(dec, SIGNAL("appendText(const QString&)"), self.logmsg.append)
+		self.connect(self.daclevel, SIGNAL("valueChanged(int)"), reader, SLOT("setDAC(int)"))
+		self.connect(self.daclevel, SIGNAL("valueChanged(int)"), self.testDAC)
+		self.feedsWidget.addFeed(None)	
+		#emit signal addFeed (fixme - only one signal updateFeeds - widget should iterate over reader list)
 
-		# control DAC automatically
-		if self.args.ditherdac:
-			self.ditherdac = DitherDAC(self)
-
-	# SLOT: Any text sent to this slot will print on the console
-	def logMsg(self, text):
-		if self.args.verbose:
-			print text
+	# FIXME -figure out why the slot above is never called directly...
+	def testDAC(self, d):
+		for r in self.app.readers:
+			r.setDAC(d)
 
 	# override to save current settings on close
 	def closeEvent(self, event):
@@ -328,7 +398,7 @@ class MainWindow(QMainWindow):
 				# connect a reader to the incoming traffic
 				a = ar()
 				a.origin = [ 0, 0 ]
-				socketReader = reader.AdsbReaderThreadClientServer(a, self.server)
+				socketReader = reader.AdsbReaderThreadClientServer(a, self.server, self.app)
 				dec = socketReader.getDecoder()
 				self.connect(dec, SIGNAL("addAircraft(PyQt_PyObject)"), self.t.addAircraft)
 				self.connect(dec, SIGNAL("updateAircraft(PyQt_PyObject)"), self.t.updateAircraft)
@@ -352,7 +422,7 @@ class MainWindow(QMainWindow):
 				self.client = client.ClientThread(a.host, a.port)
 				self.client.start()
 				print "started client thread(s) for %s port %d" % (a.host, a.port)
-				r = reader.AdsbReaderThreadSocket(a)
+				r = reader.AdsbReaderThreadSocket(a, self.app)
 
 
 	# dialog for configuring the local KML server
@@ -441,8 +511,11 @@ class DitherDAC(QObject):
 	def dacupdate(self):
 		# called periodically by timer
 		#high = 3000
-		high = 4095
-		low = 1200
+		#high = 4095
+		# fixme - make these configurable
+		high = 3300
+		#low = 1800
+		low = 1400
 		r = qrand() % ((high+1) - low) + low
 		self.mainWindow.daclevel.setValue(r)
 
@@ -482,17 +555,17 @@ def main():
 	args.origin = [float(args.origin[0]), float(args.origin[1])]
 
 	# Open the correct reader
-	if args.host != None:
-		h = args.host.split(':')
-		args.host = h[0]
-		args.port = int(h[1])
-		print args.host, args.port
-		exit
-		r = reader.AdsbReaderThreadSocket(args)
-	elif args.filename != None:
-		r = reader.AdsbReaderThreadFile(args)
-	else:
-		r = reader.AdsbReaderThreadUSB(args)
+	#if args.host != None:
+		#h = args.host.split(':')
+		#args.host = h[0]
+		#args.port = int(h[1])
+		#print args.host, args.port
+		#r = reader.AdsbReaderThreadSocket(args)
+	#elif args.filename != None:
+		#r = reader.AdsbReaderThreadFile(args)
+	#else:
+		#pass
+		#r = reader.AdsbReaderThreadUSB(args)
 
 	# start a server if instructed by command line
 	if args.server != None:
@@ -514,15 +587,8 @@ def main():
 	else:
 		en_gui = True
 
-	app = QApplication(sys.argv, en_gui)
-	app.setOrganizationDomain("openadsb.com")
-	app.setOrganizationName("OpenADSB")
-	app.setApplicationName("OpenADSBApp")
-	app.setApplicationVersion("0.1.0")
-
-	if en_gui:
-		m = MainWindow(r, args)
-	r.start()
+	app = MyApplication(sys.argv, args, en_gui)
+	#app.addReader(r)
 
 	ret = app.exec_()
 	r.kill_received = True

@@ -1,0 +1,34 @@
+airlines_icao_codes.dat from http://openflights.svn.sourceforge.net/viewvc/openflights/openflights/data/airports.dat
+
+import to database procedure :
+	- FAA data:
+		download latest data from ....
+		cd data; unzip AR09250.zip
+		dos2unix ENGINE.txt
+		// need to remove trailing spaces from all these fields prior to SQL import
+		sed 's?,$??g' ENGINE.txt > ENGINE.fixed.txt 
+		python csv2tbl.py ENGINE.fixed.txt 3
+		python csv2sql.py ENGINE.fixed.txt faa_engine "use openadsb" |sed 's?$?;?g' > engine.sql
+		mysql5  --host=openadsb1.db.9533742.hostedresource.com --user=openadsb1 --password=........... openadsb1 < ENGINE.table.sql
+		mysql5  --host=openadsb1.db.9533742.hostedresource.com --user=openadsb1 --password=........... openadsb1 < engine.sql
+		fixme:
+		need to convert illegal '-' in MASTER.txt header to underscore or use the backtick to quote them
+		format zip code as zip+four
+		format dates
+		Convert "Mode S Code" in Octal to hex?
+
+	- ICAO airline designators:
+		difficult to find combined data file which include ICAO callsign.
+		http://www.flugzeuginfo.net/table_airlinecodes_airline_en.php
+		copy/paste entire list into text file, then sort to get rid of extraneous stuff:
+		sort table_airlinecodes_airline_en.txt |grep -E -v '^IATA|^.to top.|^$' > table_airlinecodes_airline_en.txt.clean
+		this file is now tab-delimited. Import into Excel, but do no combine multiple delimiters. use text format for all columns
+		export it as csv file.
+		mac2unix table_airlinecodes_airline_en.csv
+		python csv2sql.py -t airline_codes -f iata,icao,airline,callsign,country table_airlinecodes_airline_en.csv > airline_codes.sql
+		rather than importing into a SQL database (which requires being online to use), just store as CSV file and lookup like we do with airport codes.
+		mv table_airlinecodes_airline_en.csv airline-codes.csv
+
+		
+		
+

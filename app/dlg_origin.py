@@ -5,6 +5,8 @@ import PyQt4
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
+# fixme - do this for each data source - origin, friendly name, other info?
+
 class DlgOrigin(QDialog):
 
 	def __init__(self, lat, long, parent = None):

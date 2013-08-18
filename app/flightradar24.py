@@ -5,6 +5,17 @@
 
 # we can import the following when we don't have them from ADSB: flightnum, actype, acreg, radar, origin, dest, if the ts is within some small number
 
+# here's more supported stuff from fr24.com:
+# http://www.flightradar24.com/FlightDataService.php?callsign=WZZ1MF&hex=47340F  (seem to need both callsign and hex)
+# http://www.flightradar24.com/FlightDataService.php?callsign=%20&hex=AA7F5E
+#  http://www.flightradar24.com/data/airplanes/A7-HHM
+# and these:
+# http://www.planespotters.net/search.php?q=A7-HHM
+# http://www.planepictures.net/netsearch4.cgi?srch=A7-HHM&srng=2&stype=reg
+# http://www.jetphotos.net/showphotos.php?regsearch=A7-HHM
+# http://www.airliners.net/search/photo.search?regsearch=A7-HHM
+# http://www.flightradar24.com/data/_ajaxcalls/autocomplete_airplanes.php?typing=AA7F5E
+
 import sys
 import json
 import urllib

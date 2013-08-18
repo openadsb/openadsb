@@ -38,6 +38,7 @@ class kmlServer(QThread):
 	# called periodically to regenerate the KML file
 	def updateKmlFile(self):
 		pass
+		# for each reader, get list of aircraft, and then iterate through them all
 		#dec = 
 		#for aa in sorted(dec.recentAircraft.keys()):
 			#a = self.recentAircraft[aa]
