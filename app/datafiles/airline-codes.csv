@@ -225,7 +225,7 @@ AI,AIC,Air India,AIRINDIA,India
 AJ,NIG,Aero Contractors,AEROLINE,Nigeria
 AK,AXM,AirAsia,ASIAN EXPRESS,Malaysia
 AL,TXC,TransAVIAexport Airlines,TRANSEXPORT,Belarus
-AM,AMX,AeroM̩xico,AEROMEXICO,Mexico
+AM,AMX,AeroMexico,AEROMEXICO,Mexico
 AP,ADH,Air One,HERON,Italy
 AP,AIB,Airbus Industrie,AIRBUS INDUSTRIE,France
 AR,ARG,Aerolineas Argentinas,ARGENTINA,Argentina
@@ -999,3 +999,8 @@ ZY,ADE,Ada Air,ADA AIR,Albania
 ZY,EZA,Eznis Airways,EZNIS,Mongolia
 --,TWY,Sunset Aviation,TWILIGHT,United States
 --,OPT,Flight Options,OPTIONS,United States
+--,FLT,Flight Options,OPTIONS,United States
+--,EJM,Executive Jet Management,JET SPEED,United States
+--,BOE,Boeing,BOEING,United States
+--,GTF,ELJ Aviation,GATOR FLIGHT,United States
+--,LXJ,Bombardier Business Jet Solutions,FLEXJET,United States

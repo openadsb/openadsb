@@ -865,7 +865,15 @@ class AdsbDecoder(QObject):
 				if a == None:
 					a = self.recordAircraft(aa)
 				a.setAirbornePos(lat, lon, alt, "", altTypeStr, "")
-				if cf == 5 and imf == 0:
+				if cf == 1:
+					a.setFakeICAO24(True)
+				if cf == 2 and imf == 1:		# fixme - Mode A code and track number
+					a.setFakeICAO24(True)
+				if cf == 3 and imf == 1:		# fixme - Mode A code and track number
+					a.setFakeICAO24(True)
+				if cf == 4:				# fixme -  TIS-B service volume ID 
+					a.setFakeICAO24(True)
+				if cf == 5 and imf == 0:		
 					a.setFakeICAO24(True)
 				self.emit(SIGNAL("updateAircraftPosition(PyQt_PyObject)"), a)
 
@@ -1407,9 +1415,10 @@ class AdsbDecoder(QObject):
 		# lookup country assigment for an AA
 		# taken from http://www.libhomeradar.org/databasequery/icao24allocations.php using this:
 		# cat /tmp/tmp1 |sed "s? - ?    ?g" |awk 'BEGIN { FS = "[\t]" } { print $3 "\t" $4 "\t" $1 }' |sort |awk 'BEGIN { FS = "[\t]" } {print "elif aa >= 0x" $1 " and aa < 0x" $2 ":\n\techo \"" $3 "\"" }' > /tmp/tmp2
-		if aa >= 0xA00000 and aa < 0xAE0000:		# most common first
+		# then some additions and modifications
+		if aa >= 0xA00000 and aa < 0xADFE00:		# most common first
 			c = "USA"
-		elif aa >= 0xAE0000 and aa < 0xAF0000:		
+		elif aa >= 0xADFE00 and aa < 0xAF0000:		
 			c = "US Military"
 		elif aa >= 0xAF0000 and aa < 0xB00000:		
 			c = "USA"
@@ -1767,8 +1776,12 @@ class AdsbDecoder(QObject):
 			c = "Samoa"
 		elif aa >= 0xC00000 and aa < 0xC40000:
 			c = "Canada"
-		elif aa >= 0xC80000 and aa < 0xC88000:
+		elif aa >= 0xC80000 and aa < 0xC87E00:
 			c = "New Zealand"
+		elif aa >= 0xC87E00 and aa < 0xC87F00:
+			c = "New Zealand (Ground)"
+		elif aa >= 0xC87F00 and aa < 0xC88000:
+			c = "New Zealand Military"
 		elif aa >= 0xC88000 and aa < 0xC89000:
 			c = "Fiji"
 		elif aa >= 0xC8A000 and aa < 0xC8A400:
