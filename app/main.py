@@ -83,8 +83,8 @@ class MyApplication(QApplication):
 		# connect the signals from the reader/parser to the slots
 		dec = reader.getDecoder()
 		self.connect(dec, SIGNAL("appendText(const QString&)"), self.logMsg)	# so we can print to console too
+		self.connect(dec, SIGNAL("addAircraft(PyQt_PyObject)"), self.fr24Thread.addAircraft)	# fixme - better way to order this after db.addAircraft has been executed
 		self.connect(dec, SIGNAL("addAircraft(PyQt_PyObject)"), self.dbThread.db.addAircraft)
-		self.connect(dec, SIGNAL("addAircraft(PyQt_PyObject)"), self.fr24Thread.addAircraft)
 
 		# some signals are only used with gui
 		if self.mainWindow:
@@ -186,23 +186,25 @@ class MainWindow(QMainWindow):
 		grid.addWidget(QLabel("DAC Level:"), 0, 0)
 		grid.addWidget(QLabel("RX Level:"), 1, 0)
 		grid.addWidget(QLabel("Total Packets:"), 2, 0)
-		grid.addWidget(QLabel("Good Packets:"), 3, 0)
-		grid.addWidget(QLabel("CRC Errors:"), 4, 0)
-		grid.addWidget(QLabel("Bad Short Packets:"), 5, 0)
-		grid.addWidget(QLabel("Bad Long Packets:"), 6, 0)
-		grid.addWidget(QLabel("Logfile Size:"), 7, 0)
-		grid.addWidget(QLabel("DF0 (Short ACAS Air-to-Air):"), 8, 0)
-		grid.addWidget(QLabel("DF4 (Altitude Roll-Call):"), 9, 0)
-		grid.addWidget(QLabel("DF5 (Identity Reply):"), 10, 0)
-		grid.addWidget(QLabel("DF11 (Mode S All-Call Reply):"), 11, 0)
-		grid.addWidget(QLabel("DF17 (Extended Squitter):"), 12, 0)
-		grid.addWidget(QLabel("DF18 (TIS-B):"), 13, 0)
-		grid.addWidget(QLabel("DF20 (Comm-B Altitude Reply):"), 14, 0)
-		grid.addWidget(QLabel("DF21 (Comm-B Identity Reply):"), 15, 0)
-		grid.addWidget(QLabel("DF Other (Unknown):"), 16, 0)
+		grid.addWidget(QLabel("Packet rate:"), 3, 0)
+		grid.addWidget(QLabel("Good Packets:"), 4, 0)
+		grid.addWidget(QLabel("CRC Errors:"), 5, 0)
+		grid.addWidget(QLabel("Bad Short Packets:"), 6, 0)
+		grid.addWidget(QLabel("Bad Long Packets:"), 7, 0)
+		grid.addWidget(QLabel("Logfile Size:"), 8, 0)
+		grid.addWidget(QLabel("DF0 (Short ACAS Air-to-Air):"), 9, 0)
+		grid.addWidget(QLabel("DF4 (Altitude Roll-Call):"), 10, 0)
+		grid.addWidget(QLabel("DF5 (Identity Reply):"), 11, 0)
+		grid.addWidget(QLabel("DF11 (Mode S All-Call Reply):"), 12, 0)
+		grid.addWidget(QLabel("DF17 (Extended Squitter):"), 13, 0)
+		grid.addWidget(QLabel("DF18 (TIS-B):"), 14, 0)
+		grid.addWidget(QLabel("DF20 (Comm-B Altitude Reply):"), 15, 0)
+		grid.addWidget(QLabel("DF21 (Comm-B Identity Reply):"), 16, 0)
+		grid.addWidget(QLabel("DF Other (Unknown):"), 17, 0)
 
 		self.rxLevel = QLabel("0")
 		self.totalPkts = QLabel("0")
+		self.packetRate = QLabel("0")
 		self.goodPkts = QLabel("0")
 		self.CrcErrs = QLabel("0")
 		self.DF0 = QLabel("0")
@@ -220,22 +222,30 @@ class MainWindow(QMainWindow):
 		grid.addWidget(self.daclevel, 0, 1)
 		grid.addWidget(self.rxLevel, 1, 1)
 		grid.addWidget(self.totalPkts, 2, 1)
-		grid.addWidget(self.goodPkts, 3, 1)
-		grid.addWidget(self.CrcErrs, 4, 1)
-		grid.addWidget(self.badShortPkts, 5, 1)
-		grid.addWidget(self.badLongPkts, 6, 1)
-		grid.addWidget(self.logfileSize, 7, 1)
-		grid.addWidget(self.DF0, 8, 1)
-		grid.addWidget(self.DF4, 9, 1)
-		grid.addWidget(self.DF5, 10, 1)
-		grid.addWidget(self.DF11, 11, 1)
-		grid.addWidget(self.DF17, 12, 1)
-		grid.addWidget(self.DF18, 13, 1)
-		grid.addWidget(self.DF20, 14, 1)
-		grid.addWidget(self.DF21, 15, 1)
-		grid.addWidget(self.DFOther, 16, 1)
+		grid.addWidget(self.packetRate, 3, 1)
+		grid.addWidget(self.goodPkts, 4, 1)
+		grid.addWidget(self.CrcErrs, 5, 1)
+		grid.addWidget(self.badShortPkts, 6, 1)
+		grid.addWidget(self.badLongPkts, 7, 1)
+		grid.addWidget(self.logfileSize, 8, 1)
+		grid.addWidget(self.DF0, 9, 1)
+		grid.addWidget(self.DF4, 10, 1)
+		grid.addWidget(self.DF5, 11, 1)
+		grid.addWidget(self.DF11, 12, 1)
+		grid.addWidget(self.DF17, 13, 1)
+		grid.addWidget(self.DF18, 14, 1)
+		grid.addWidget(self.DF20, 15, 1)
+		grid.addWidget(self.DF21, 16, 1)
+		grid.addWidget(self.DFOther, 17, 1)
 		statsWindow = QWidget()
 		statsWindow.setLayout(grid)
+
+		# timer for packets/sec 
+		self.packetRateTimer = QTimer()
+		self.connect(self.packetRateTimer, SIGNAL("timeout()"), self.updatePacketRate)
+		self.packetRateFilter = [ 0, 0, 0, 0, 0, 0 ]	
+		self.lastPacketCount = 0
+		self.packetRateTimer.start(500)
 
 		# Google Maps window
 		self.gmapsWindow = gmaps.gmaps(self)
@@ -322,6 +332,18 @@ class MainWindow(QMainWindow):
 		# connect database thread and flightradar24 lookup thread to the tablewidget
 		self.connect(self.app.dbThread.db, SIGNAL("updateAircraftDbInfo(PyQt_PyObject)"), self.t.updateAircraftDbInfo)
 		self.connect(self.app.fr24Thread, SIGNAL("updateAircraftFR24Info(PyQt_PyObject)"), self.t.updateAircraftFR24Info)
+
+	# update average packet rate, averaged over 3 seconds
+	# we get here every 0.5 second
+	def updatePacketRate(self):
+		count = int(self.totalPkts.text())
+		l = len(self.packetRateFilter)
+		rate = float(sum(self.packetRateFilter)) / float(l) / 0.5
+		self.packetRateFilter[1:l] = self.packetRateFilter[0:l-1]
+		self.packetRateFilter[0] = count - self.lastPacketCount
+		self.packetRate.setText("%.0f / sec"% rate)
+		self.lastPacketCount = count
+		
 
 	# connect gui signals for this new reader
 	def addReader(self, reader):

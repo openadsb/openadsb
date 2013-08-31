@@ -101,10 +101,10 @@ class MyTableWidget(QTableWidget):
 	row = self.rownum[int(aa)]
 	if row != None:
 		if val:
-			print "setHighlightRow on for row ", row
+			#print "setHighlightRow on for row ", row
 			self.selectRow(row);
 		else:
-			print "setHighlightRow off for row ", row
+			#print "setHighlightRow off for row ", row
 			self.selectRow(-1);
 	return
 

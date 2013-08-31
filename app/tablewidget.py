@@ -84,6 +84,9 @@ class MyTableWidget(QTableWidget):
 	self.resizeColumnsToContents()
     	#self.setVisible(True)		# this is a hack
 	
+    def emptyColumnList(self):
+	return [ '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '' ]
+
     # These are SLOTS
     def addRow(self, id, columnlist):	
 	self.mutex.lock() 		# disable sorting around this addition
@@ -120,24 +123,29 @@ class MyTableWidget(QTableWidget):
 	row = self.rownum[int(aa)]
 	if row != None:
 		if val:
-			print "setHighlightRow on for row ", row
+			#print "setHighlightRow on for row ", row
 			self.selectRow(row);
 		else:
-			print "setHighlightRow off for row ", row
+			#print "setHighlightRow off for row ", row
 			self.selectRow(-1);
 	return
-
+	
     def updateRowByID(self, id, columnlist):
-	row = self.rownum[int(id)]
-	if row != None:
-		n = 1
-		for col in columnlist:
-			item = self.item(row, n)
-			item.setText(col)
-			n += 1
-	#self.resize()
-	if self.sortAlways:
-		self.doSort(self.lastSortCol, self.lastSortOrder)
+	#print "updateRowByID"
+	#print int(id)
+	#print type(int(id))
+	try:
+		row = self.rownum[int(id)]
+		if row != None:
+			n = 1
+			for col in columnlist:
+				item = self.item(row, n)
+				item.setText(col)
+				n += 1
+		if self.sortAlways:
+			self.doSort(self.lastSortCol, self.lastSortOrder)
+	except KeyError:
+		row = self.addRow(id, columnlist)
 	return
 
     def updateDbInfo(self, i):
@@ -164,7 +172,14 @@ class MyTableWidget(QTableWidget):
 	
     def updateFR24Info(self, i):
 	aa = int(i.aa, 16)			
-	row = self.rownum[aa]
+	print "UpdateFR24Info:"
+	print aa
+	#print type(aa)
+	try:
+		row = self.rownum[aa]
+	except KeyError:
+		row = self.addRow(aa, self.emptyColumnList())
+		
 	if row != None:
 		text = "%s to %s" % (i.originVerbose, i.destinationVerbose)
 		item = self.item(row, 26)
@@ -220,11 +235,13 @@ class AdsbTableWidget(MyTableWidget):
 
 	# These are SLOTS
 	def addAircraft(self, ac):
-		self.addRow(ac.aa, [ str(ac.timestamp), ("%X"%ac.aa), ac.countryStr, ac.idStr, ac.airlineStr, ac.callsignStr, ac.fsStr, ac.rangeStr, ac.elevStr, ac.bearingStr, 
-					ac.posStr, str(ac.alt), ac.vertStr, ac.heading, ac.velStr,
-					'', ac.squawkStr, ac.catStr, ac.riStr, str(ac.pkts), str(len(ac.track)), '', '', '', '', '' ])
+		#self.addRow(ac.aa, [ str(ac.timestamp), ("%X"%ac.aa), ac.countryStr, ac.idStr, ac.airlineStr, ac.callsignStr, ac.fsStr, ac.rangeStr, ac.elevStr, ac.bearingStr, 
+		self.updateRowByID(ac.aa, [ str(ac.timestamp), ("%X"%ac.aa), ac.countryStr, ac.idStr, ac.airlineStr, ac.callsignStr, ac.fsStr, ac.rangeStr, ac.elevStr, ac.bearingStr, 
+					ac.posStr, str(ac.alt), ac.vertStr, ac.headingStr, ac.velStr,
+					#'', ac.squawkStr, ac.catStr, ac.riStr, str(ac.pkts), str(len(ac.track)), '', '', '', '', '' ])
+					'', ac.squawkStr, ac.catStr, ac.riStr, str(ac.pkts), str(len(ac.track)), '', '', '', '' ])
 		QSound.play("beep2.wav");
-
+		
 	def updateAircraft(self, ac):
 		self.updateRowByID(ac.aa, [ str(ac.timestamp), ("%X"%ac.aa), ac.countryStr, ac.idStr, ac.airlineStr, ac.callsignStr, ac.fsStr, ac.rangeStr, ac.elevStr, ac.bearingStr, 
 					ac.posStr, str(ac.alt), ac.vertStr, ac.headingStr, ac.velStr,

@@ -83,15 +83,15 @@ class fr24(QObject):
 	def lookupFlight(self, aa):
 		try:
 			f = self.flights[aa]
-			#print "Found a flight matching AA = ",aa
+			print "Found a flight matching AA = ",aa
 			if f.origin != '':
 				f.originVerbose = self.airports.lookup(f.origin)
 			if f.destination != '':
 				f.destinationVerbose = self.airports.lookup(f.destination)
-			#f.printInfo()
+			f.printInfo()
 			return f
 		except:
-			#print "FR24: Did not find flight with AA = ", aa
+			print "FR24: Did not find flight with AA = ", aa
 			return None
 
 	def getfile(self):
@@ -208,6 +208,7 @@ class fr24Thread(QThread):
 
 	# slot which listens for new aircraft being detected
 	# perform lookup and emit signal with database info
+	# fixme - this should happen only after the AA has been added to the tablewidget
 	def addAircraft(self, ac):
 		aa = "%X" % ac.aa
 		#print "FR24 addAircraft: aa =", aa
