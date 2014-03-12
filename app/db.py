@@ -213,7 +213,7 @@ class AircraftDb(QObject):
 	def addAircraft(self, ac):
 		i = AircraftDbInfo(ac.aa)
 		aa = "%X"%ac.aa	
-		if ac.fakeICAO24:
+		if ac.fakeICAO24:		# BUG - this only gets set after addAircraft signal was sent - can be missed
 			i.registrationStr = "N/A"
 			i.typeStr = "Non-ICAO24"
 			i.ownerStr = "N/A"
