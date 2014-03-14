@@ -1241,8 +1241,8 @@ class AdsbDecoder(QObject):
 			print "short DF18 pkt"
 			return
 
-		[ df, tcStr, aaStr, nonIcaoStr, logStr, errStr ] = self.DecodeCommon_DF17_DF18(pkt)
-		self.logMsg("  DF%u (TIS-B): %s Aircraft ID %s%s. %s %s" % (df, tcStr, aaStr, nonIcaoStr, logStr, errStr))
+		[ df, ic, tcStr, aaStr, nonIcaoStr, logStr, errStr ] = self.DecodeCommon_DF17_DF18(pkt)
+		self.logMsg("  DF%u (TIS-B): %s Aircraft ID %s%s. IIC %d. %s %s" % (df, tcStr, aaStr, nonIcaoStr, ic, logStr, errStr))
 		return
 
 	def decodeSurveillanceStatus(self, ss):
@@ -1518,6 +1518,7 @@ class AdsbDecoder(QObject):
 		self.logMsg("  DF%u (Comm-B Identity Reply): IID=%u. Squawk %04u. %s. %s %s" % (df, iis, squawk, fsStr, drStr, crcStr))
 
 		
+	# FIXME - this is pressure-altitude.  height = PA - 30*(1013-QNH) or PA - 1000*(29.92 - alt. setting)
 	def AltitudeCode(self, ac):
 		# Refer to section 3.1.2.6.5.4
 		# The bit number in the ICAO annex assume this ac covers bit positions 20-32
@@ -1549,6 +1550,7 @@ class AdsbDecoder(QObject):
 		elif q == 0:
 			# m = 0, q = 0
 			# mode c encoding - gillham code
+			# FIXME - this is pressure-altitude.  height = PA - 30*(1013-QNH) or PA - 1000*(29.92 - alt. setting)
 			c1 = ac[20-20]
 			a1 = ac[21-20]
 			c2 = ac[22-20]
