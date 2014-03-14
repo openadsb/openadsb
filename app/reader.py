@@ -81,13 +81,19 @@ class AdsbReaderThread(QThread):
 	# fixme - handle race condition when starting/stopping?
 	if(self.server != None):
 		d = bytearray(d)		# FIXME - bk this should be a byte array before this call...
+
 		# for now convert this to a string - should probably be done in the server, since it will vary with format
+		# My format
 		ts = time.time()
 		str = ""
 		for byte in d:
 			str += "%02hx " % byte
 		str2 = "%u %u %s\n" % (ts, len(d), str)
 		self.server.put(str2)
+
+		# FIXME - "Beast" format: 
+		# date    time     packet
+		#20120528 12:37:53 *A8000800E6DA2123FDD7BE5052FE;
 
     @pyqtSlot('int')
     def setDAC(self, v):
@@ -141,7 +147,7 @@ class AdsbReaderThreadFile(AdsbReaderThread):
 				pass
 		ls += len(d)
 		d = RDONLY_PACKETLOG.readline();
-		if (count%5) == 0:
+		if (count%5000) == 0:
 			time.sleep(0.02)		# yield briefly, since we cannot control thread priority
 	#decoder.dumpAircraftTracks()
 	return 0

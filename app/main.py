@@ -56,10 +56,15 @@ class MyApplication(QApplication):
 		if self.args.ditherdac:
 			self.ditherdac = DitherDAC(self.mainWindow)		# fixme - make it work w/o gui too
 
-		# USB data source
-		self.usbHotplugThread = reader.UsbHotplugWatcher(self)
-		self.connect(self.usbHotplugThread, SIGNAL("addReader(PyQt_PyObject)"), self.addReader)
-		self.usbHotplugThread.start()
+		# file source
+		if self.args.filename != None:
+			r = reader.AdsbReaderThreadFile(self.args, self)
+			self.addReader(r)
+		else:
+			# USB data source
+			self.usbHotplugThread = reader.UsbHotplugWatcher(self)
+			self.connect(self.usbHotplugThread, SIGNAL("addReader(PyQt_PyObject)"), self.addReader)
+			self.usbHotplugThread.start()
 
 		# Network data source
 		if self.args.host != None:
@@ -196,11 +201,13 @@ class MainWindow(QMainWindow):
 		grid.addWidget(QLabel("DF4 (Altitude Roll-Call):"), 10, 0)
 		grid.addWidget(QLabel("DF5 (Identity Reply):"), 11, 0)
 		grid.addWidget(QLabel("DF11 (Mode S All-Call Reply):"), 12, 0)
-		grid.addWidget(QLabel("DF17 (Extended Squitter):"), 13, 0)
-		grid.addWidget(QLabel("DF18 (TIS-B):"), 14, 0)
-		grid.addWidget(QLabel("DF20 (Comm-B Altitude Reply):"), 15, 0)
-		grid.addWidget(QLabel("DF21 (Comm-B Identity Reply):"), 16, 0)
-		grid.addWidget(QLabel("DF Other (Unknown):"), 17, 0)
+		grid.addWidget(QLabel("DF16 (Long ACAS Air-to-Air):"), 13, 0)
+		grid.addWidget(QLabel("DF17 (Extended Squitter):"), 14, 0)
+		grid.addWidget(QLabel("DF18 (TIS-B):"), 15, 0)
+		grid.addWidget(QLabel("DF20 (Comm-B Altitude Reply):"), 16, 0)
+		grid.addWidget(QLabel("DF21 (Comm-B Identity Reply):"), 17, 0)
+		grid.addWidget(QLabel("DF Other (Unknown):"), 18, 0)
+		grid.addWidget(QLabel("List of Interrogators:"), 19, 0)
 
 		self.rxLevel = QLabel("0")
 		self.totalPkts = QLabel("0")
@@ -211,10 +218,12 @@ class MainWindow(QMainWindow):
 		self.DF4 = QLabel("0")
 		self.DF5 = QLabel("0")
 		self.DF11 = QLabel("0")
+		self.DF16 = QLabel("0")
 		self.DF17 = QLabel("0")
 		self.DF18 = QLabel("0")
 		self.DF20 = QLabel("0")
 		self.DF21 = QLabel("0")
+		self.IICs = QLabel("")
 		self.DFOther = QLabel("0")
 		self.badShortPkts = QLabel("0")
 		self.badLongPkts = QLabel("0")
@@ -232,11 +241,13 @@ class MainWindow(QMainWindow):
 		grid.addWidget(self.DF4, 10, 1)
 		grid.addWidget(self.DF5, 11, 1)
 		grid.addWidget(self.DF11, 12, 1)
-		grid.addWidget(self.DF17, 13, 1)
-		grid.addWidget(self.DF18, 14, 1)
-		grid.addWidget(self.DF20, 15, 1)
-		grid.addWidget(self.DF21, 16, 1)
-		grid.addWidget(self.DFOther, 17, 1)
+		grid.addWidget(self.DF16, 13, 1)
+		grid.addWidget(self.DF17, 14, 1)
+		grid.addWidget(self.DF18, 15, 1)
+		grid.addWidget(self.DF20, 16, 1)
+		grid.addWidget(self.DF21, 17, 1)
+		grid.addWidget(self.DFOther, 18, 1)
+		grid.addWidget(self.IICs, 19, 1)
 		statsWindow = QWidget()
 		statsWindow.setLayout(grid)
 
@@ -508,11 +519,21 @@ class MainWindow(QMainWindow):
 		self.DF4.setNum(stats.DF4)
 		self.DF5.setNum(stats.DF5)
 		self.DF11.setNum(stats.DF11)
+		self.DF16.setNum(stats.DF17)
 		self.DF17.setNum(stats.DF17)
 		self.DF18.setNum(stats.DF18)
 		self.DF20.setNum(stats.DF20)
 		self.DF21.setNum(stats.DF21)
 		self.DFOther.setNum(stats.DFOther)
+
+		ics = ""
+		for (ic,seen) in enumerate(stats.IICSeen):
+			if ic != 0 and seen:
+				ics += "%d, " % ic
+		if len(ics) != 0:
+			ics = ics.strip(", ")		# strip trailing comma
+		self.IICs.setText(ics)
+
 		if stats.logfileSize < 1024:
 			self.logfileSize.setText("%u B"%(stats.logfileSize))
 		elif stats.logfileSize < 1024*1024:

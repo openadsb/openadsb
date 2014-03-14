@@ -52,7 +52,6 @@ class Aircraft(QObject):
 		self.caStr = ""
 		self.catStr = ""
 		self.posStr = ""
-		#self.moveStr = ""
 		self.altStr = ""
 		self.posUncertStr = ""
 		self.altTypeStr = ""
@@ -80,6 +79,47 @@ class Aircraft(QObject):
 		self.timestamp = time.time()
 		self.countryStr = decoder.lookupCountry(aa)
 		self.track = [ ]
+		self.IICSeen = [False] * 16; # which interrogator codes have we seen
+		self.IICSeenStr = ""
+	
+		#self.minAlt
+		#self.maxAlt
+		#self.minRange
+		#self.maxRange
+		#self.minAirspeed
+		#self.maxAirspeed
+		#self.minGroundspeed
+		#self.maxGroundspeed
+		#self.maxClimbRate
+		#self.maxDescentRate
+
+		#self.positionAccuracy = 	# meters
+		#self.identActive = false
+		#self.latchedIdent = false	# ever
+		#self.autopilotEngaged = false
+		#self.altitudeHold = false
+		#self.approachMode = false
+		#self.targetAlt = 0
+		#self.barometerRef = 0
+		#self.activeRA = false	
+		#self.acasSensitivityLevel = 0
+		#self.acasMode = 		# inhibited, vert only, horz/vert
+		#self.raStr = ""		# make this a list of RA objects, and store timestamps and details
+		#self.emergency = 0		# 7500, 7600, 7700
+		#self.latchedEmergency = 0	# ever
+		#self.capTransponderLevel = 1	# level 1, level 2
+		#self.capCrosslink = false
+		#self.capTCAS = false
+		#self.capACAS = 0			# ACAS 1, 2, 3
+		#self.capExtSquitterRx = false
+		#self.capUATRx = false
+		#self.capSingleAntenna = false
+		#self.capTargetStateRep = false
+		#self.capAirVelRep = false
+		#self.capOnGround = false
+		#self.capVersion2 = false
+		#self.capVersion1 = false
+		#self.capVersion0 = false
 
 	def __del__(self):
 		pass
@@ -136,6 +176,16 @@ class Aircraft(QObject):
 
 	def getTimestamp(self):
 		return self.timestamp
+
+	def setIICSeen(self, ic):
+		self.IICSeen[ic] = True;
+		ics = ""
+		for (ic,seen) in enumerate(self.IICSeen):
+			if ic != 0 and seen:
+				ics += "%d, " % ic
+		if len(ics) != 0:
+			ics = ics.strip(", ")           # strip trailing comma
+		self.IICSeenStr = ics
 
 	def setIdentityInfo(self, idStr, catStr):
 		self.pkts += 1
@@ -204,7 +254,8 @@ class Aircraft(QObject):
 
 	def setACASInfo(self, ccStr, alt, riStr, acasStr, vsStr):
 		self.pkts += 1
-		self.ccStr = ccStr
+		if ccStr != None:
+			self.ccStr = ccStr
 		if alt != 0:
 			self.alt = alt
 		if riStr != "":

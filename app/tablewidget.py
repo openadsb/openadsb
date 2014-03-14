@@ -85,7 +85,7 @@ class MyTableWidget(QTableWidget):
     	#self.setVisible(True)		# this is a hack
 	
     def emptyColumnList(self):
-	return [ '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '' ]
+	return [ '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '' ]
 
     # These are SLOTS
     def addRow(self, id, columnlist):	
@@ -152,18 +152,18 @@ class MyTableWidget(QTableWidget):
 	row = self.rownum[i.aa]
 	if row != None:
 		text = "N%s" % i.registrationStr		# fixme - USA only
-		item = self.item(row, 22)
+		item = self.item(row, 23)
 		item.setText(text)
 
-		item = self.item(row, 23)
+		item = self.item(row, 24)
 		item.setText(i.acTypeStr)
 
 		text = "%s %s %s, %u seats, %u %s engines with %s" % (i.yearBuilt, i.acMfgStr, i.acModelStr, i.numSeats, i.numEng, i.engTypeStr, i.engPowerStr)
-		item = self.item(row, 24)
+		item = self.item(row, 25)
 		item.setText(text)
 
 		text = "%s, %s, %s %s" % (i.ownerStr, i.ownerCityStr, i.ownerStateStr, i.ownerCountryStr)
-		item = self.item(row, 25)
+		item = self.item(row, 26)
 		item.setText(text)
 	if self.sortAlways:
 		self.doSort(self.lastSortCol, self.lastSortOrder)
@@ -182,7 +182,7 @@ class MyTableWidget(QTableWidget):
 		
 	if row != None:
 		text = "%s to %s" % (i.originVerbose, i.destinationVerbose)
-		item = self.item(row, 26)
+		item = self.item(row, 27)
 		item.setText(text)
 
 	if self.sortAlways:
@@ -222,7 +222,7 @@ class AdsbTableWidget(MyTableWidget):
 	def __init__(self, mainWindow):
 		hdrs = [	'Plot', 'Time', 'ICAO24', 'Country', 'Flight ID', 'Airline', 'Callsign', 'Status', 'Range', 'Elevation', 
 				'Azimuth', 'Position', 'Altitude', 'Vertical rate', 'Heading', 'Speed', 
-				'Ground speed', 'Squawk', 'Category', 'Max speed', 'Packets', 'Track Points', 'Tail Number', 'Type', 'Kind', 'Owner', 'From/To' ]
+				'Ground speed', 'Squawk', 'Category', 'Max speed', 'Packets', 'Track Points', 'Radars Seen', 'Tail Number', 'Type', 'Kind', 'Owner', 'From/To' ]
 		MyTableWidget.__init__(self, hdrs, mainWindow)
 
 	# fixme - squawk should highlight for special codes
@@ -235,17 +235,15 @@ class AdsbTableWidget(MyTableWidget):
 
 	# These are SLOTS
 	def addAircraft(self, ac):
-		#self.addRow(ac.aa, [ str(ac.timestamp), ("%X"%ac.aa), ac.countryStr, ac.idStr, ac.airlineStr, ac.callsignStr, ac.fsStr, ac.rangeStr, ac.elevStr, ac.bearingStr, 
 		self.updateRowByID(ac.aa, [ str(ac.timestamp), ("%X"%ac.aa), ac.countryStr, ac.idStr, ac.airlineStr, ac.callsignStr, ac.fsStr, ac.rangeStr, ac.elevStr, ac.bearingStr, 
 					ac.posStr, str(ac.alt), ac.vertStr, ac.headingStr, ac.velStr,
-					#'', ac.squawkStr, ac.catStr, ac.riStr, str(ac.pkts), str(len(ac.track)), '', '', '', '', '' ])
-					'', ac.squawkStr, ac.catStr, ac.riStr, str(ac.pkts), str(len(ac.track)), '', '', '', '' ])
+					'', ac.squawkStr, ac.catStr, ac.riStr, str(ac.pkts), str(len(ac.track)), ac.IICSeenStr, '', '', '', '', '' ])
 		QSound.play("beep2.wav");
 		
 	def updateAircraft(self, ac):
 		self.updateRowByID(ac.aa, [ str(ac.timestamp), ("%X"%ac.aa), ac.countryStr, ac.idStr, ac.airlineStr, ac.callsignStr, ac.fsStr, ac.rangeStr, ac.elevStr, ac.bearingStr, 
 					ac.posStr, str(ac.alt), ac.vertStr, ac.headingStr, ac.velStr,
-					'', ac.squawkStr, ac.catStr, ac.riStr, str(ac.pkts), str(len(ac.track)) ])
+					'', ac.squawkStr, ac.catStr, ac.riStr, str(ac.pkts), str(len(ac.track)), ac.IICSeenStr ])
 
 	def updateAircraftPosition(self, ac):
 		return self.updateAircraft(ac)

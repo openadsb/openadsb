@@ -32,6 +32,7 @@ class DecoderStats:
 		self.DF4 = 0
 		self.DF5 = 0
 		self.DF11 = 0
+		self.DF16 = 0
 		self.DF17 = 0
 		self.DF18 = 0
 		self.DF20 = 0
@@ -41,6 +42,7 @@ class DecoderStats:
 		self.goodPkts = 0	# CRC good, decoded properly
 		self.uniqueAA = 0
 		self.ACASonly = 0	# AAs that only send ACAS, not other ADS-B
+		self.IICSeen = [False] * 16; # which interrogator codes have we seen 
 
 # This class parses and decodes the ADS-B messages.
 class AdsbDecoder(QObject):
@@ -52,10 +54,6 @@ class AdsbDecoder(QObject):
 		self.recentAircraft = {}
 		self.origin = self.args.origin
 		self.stats = DecoderStats()
-		#self.badShortPkts = 0
-		#self.badLongPkts = 0
-		#self.totalPkts = 0
-		#self.rxLevel = 0
 
 	def __del__(self):
 		pass
@@ -63,7 +61,6 @@ class AdsbDecoder(QObject):
 		#for aa in self.recentAircraft.keys():
 			#del self.recentAircraft[aa]
 
-		
 
 	# Some statistics are maintained by the decoder, but are gleaned from the reader or elsewhere
 	def updateStats(self, rxLevel, badShort, badLong, logfilesize):
@@ -100,6 +97,9 @@ class AdsbDecoder(QObject):
 		elif df == 11:
 			self.DecodeDF11(b)
 			self.stats.DF11 += 1
+		elif df == 16:
+			self.DecodeDF16(b)
+			self.stats.DF16 += 1
 		elif df == 17:
 			self.DecodeDF17(b)
 			self.stats.DF17 += 1
@@ -156,6 +156,11 @@ class AdsbDecoder(QObject):
 		else:
 			vsStr = "On Ground"
 
+		if sl == 0:
+			slStr = "ACAS not operating"
+		else:
+			slStr = "Sensitivity level %d" % (sl)
+
 		# fixme - these come in in sequential packets to describe both ACAS and max speed.  Fill these into two different vars
 		riStr = ""
 		acasStr = ""
@@ -202,8 +207,7 @@ class AdsbDecoder(QObject):
 		else:
 			crcStr = "CRC error or no all-call received yet from ID %x." % (aa.uint)
 			self.stats.CrcErrs += 1
-		#print "  DF%u (Short ACAS Air-to-Air): %s. %s. %s. %s. %s. ap=%x. %s" % (df, vsStr, altStr, riStr, acasStr, ccStr, ap.uint, crcStr)
-		self.logMsg("  DF%u (Short ACAS Air-to-Air): %s. %s. %s. %s. %s. %s" % (df, vsStr, altStr, riStr, acasStr, ccStr, crcStr))
+		self.logMsg("  DF%u (Short ACAS Air-to-Air): %s. %s. %s. %s. %s. %s. %s" % (df, vsStr, altStr, riStr, acasStr, slStr, ccStr, crcStr))
 
 	def DecodeDF4(self, pkt):
 		# Surveillance altitude reply
@@ -230,7 +234,6 @@ class AdsbDecoder(QObject):
 		else:
 			crcStr = "CRC error or no all-call received yet from ID %x." % (aa.uint)
 			self.stats.CrcErrs += 1
-		#print "  DF%u (Altitude Roll-Call): IID=%u. %s. %s. %s. ap=%x. %s" % (df, iis, fsStr, altStr, drStr, ap.uint, crcStr)
 		self.logMsg("  DF%u (Altitude Roll-Call): IID=%u. %s. %s. %s. %s" % (df, iis, fsStr, altStr, drStr, crcStr))
 		
 	def downlinkReqStr(self, dr):
@@ -352,7 +355,6 @@ class AdsbDecoder(QObject):
 		else:
 			crcStr = "CRC error or no all-call received yet from ID %x." % (aa.uint)
 			self.stats.CrcErrs += 1
-		#print "  DF%u (Identity Reply): IID=%u. %s. Squawk %04u. %s. ap=%x. %s" % (df, iis, fsStr, squawk, drStr, ap.uint, crcStr )
 		self.logMsg( "  DF%u (Identity Reply): IID=%u. %s. Squawk %04u. %s. %s" % (df, iis, fsStr, squawk, drStr, crcStr ))
 
 	def DecodeDF11(self, pkt):
@@ -364,19 +366,293 @@ class AdsbDecoder(QObject):
 		pi = pkt[32:56]
 		caStr = self.capabilitiesStr(ca)
 		crc = self.calcParity(pkt[0:32])
-		if crc == pi:
+
+		# replies to interrogators XOR their IIC and SI with the last 7 bits of the CRC	
+		(good, ic, cl, broadcastStr) = self.checkParityInterrogator(pi, crc)
+
+		if good:
 			# CRC good and AA known
 			a = self.lookupAircraft(aa)
 			if a == None:
 				a = self.recordAircraft(aa)
 			errStr = ""
 			self.stats.goodPkts += 1
+			if cl == 0:			# IC is the IIC
+				self.stats.IICSeen[ic] = True
+				a.setIICSeen(ic)
 		else:
 			errStr = "CRC error (expected %x, rx %x)." % (crc.uint, pi.uint)
 			self.stats.CrcErrs += 1
-		#print "  DF%u (Mode S All-Call Reply): %s Aircraft ID %03hx. %s" % (df, caStr, aa, errStr)
-		self.logMsg("  DF%u (Mode S All-Call Reply): %s Aircraft ID %03hx. %s" % (df, caStr, aa, errStr))
+		self.logMsg("  DF%u (Mode S All-Call Reply): %s Aircraft ID %03hx. IIC %d, CL %d. %s %s" % (df, caStr, aa, ic, cl, broadcastStr, errStr))
+
+
+	# Problem - Mode S protocol doesn't identify the register number in the reply.  So 
+	# unless we know apriori which register this is, we don't know how to decode.  Only the interrogator
+	# knows, since it knows which register it asked for..
+	# Only exception is for 'downlink broadcasts' which include the register number as the first 8 bits,
+	# followed by 48 user bits: 0x00, 0x02, 0x10, 0x20, 0xFE, 0xFF.  
+	# Also, DF16 packets include the register number to decode
+	def decodeBDS(self, bds, mb):
+		# Comm-B message payload, 56 bits
+		# contents of a transponder register
+		#bds = mb[0:8].uint	# BDS register number for some registers
+		print "FIXME - Got BDS register 0x%x: 0x%x %s" % (bds, mb[8:].uint, self.decodeChars(mb[8:]))
+		#print "FIXME - Got Comm-B BDS register 0x%014x %s" % (mb[0:].uint, self.decodeChars(mb[8:]))
+
+		# Comm-B register assignments (BDS)
+		# ELS: 20, 30
+		# EHS: 40, 50, 60
+		# ADS-B: 05, 06, 07, 08, 09, 0A, 41, 42, 61, 64, 65
+		# capabilities: 10, 18, 19, 1A, 1B, 1C
+
+		# 00 Not valid
+		# 01 Unassigned
+		# 02 Linked Comm-B, segment 2
+		# 03 Linked Comm-B, segment 3
+		# 04 Linked Comm-B, segment 4
+		# 05 Extended squitter airborne position
+		# 06 Extended squitter surface position
+		# 07 Extended squitter status
+		# 08 Extended squitter identification and type 
+		# 09 Extended squitter airborne velocity
+		# 0A Extended squitter event-driven information 
+		# 0B Air/air information 1 (aircraft state)
+		# 0C Air/air information 2 (aircraft intent)
+		# 0D-0E Reserved for air/air state information 
+		# 0F Reserved for ACAS
+
+		# 10 Data link capability report (register self identifies)
+		if bds == 0x10 and mb[0:8] == 0x10:
+			continues = mb[8:9]		# 1 continues in next reg
+			modes_ver = mb[16:23]  		# 0 unavailable, 1, 2, 3
+			if mb[23:24] == 0:
+				transponderLevelStr = "2 to 4";
+			else:
+				transponderLevelStr = "5";
+			srvc_cap = mb[24:25]		# 1 available
+			uplink_throughput = mb[25:28]	# 0 none, otherwise 16 segments in 1/2n seconds
+			downlink_throughput = mb[28:32]	# 0 none
+			id_cap = mb[32:33]		# 1 id capability
+			print "Mode S version %d, transponder level, ID capability %d." % (modes_ver, transponderLvlStr, id_cap)
 			
+		# 11-16 Reserved for extension to data link capability reports 
+		# 17 Common usage GICB capability report
+		# 18-1F Mode S specific services capability reports 
+
+		# 20 Aircraft identification (register self-identifies)
+		elif bds == 0x20 and mb[0:8] == 0x20:
+			if mb[8:].uint != 0:
+				acid = self.decodeChars(mb[8:])
+				print "Aircraft identifies as %s" % acid
+
+		# 21 Aircraft and airline registration markings 
+		# 22 Antenna positions
+		# 23 Reserved for antenna position
+		# 24 Reserved for aircraft parameters
+		# 25 Aircraft type
+		# 26-2F Unassigned
+		# 30 ACAS active resolution advisory
+		# 31-3F Unassigned
+		# 40 Selected vertical intention
+		#if bds == 0x40:
+			#mcp_selected_alt = mb[0:13]
+			#fms_selected_alt = mb[13:26]
+			#barometric = mb[26:39]		# minus 800 mb
+			#mcp_mode_bits = mb[47:51]
+			#target_alt = mb[53:56]
+		# 41 Next waypoint identifier
+		# 42 Next waypoint position
+		# 43 Next waypoint information
+		# 44 Meteorological routine air report
+		# 45 Meteorological hazard report
+		# 46 Reserved for flight management system Mode 1 
+		# 47 Reserved for flight management system Mode 2 
+		# 48 VHF channel report
+		# 49-4F Unassigned
+		# 50 Track and turn report 
+		elif bds == 0x50:
+			roll = mb[0:11]
+			true_track = mb[11:23]
+			gnd_speed = mb[23:34]
+			track_ang_rate = mb[34:45]
+			true_airspeed = mb[45:56]
+		
+		# 51 Position report coarse
+		# 52 Position report fine
+		# 53 Air-referenced state vector 
+		# 54 Waypoint 1
+		# 55 Waypoint 2
+		# 56 Waypoint 3
+		# 57-5E Unassigned
+		# 5F Quasi-static parameter monitoring
+		# 60 Heading and speed report
+		#if bds == 0x60:
+			#heading = mb[0:12]
+			#ind_airspeed = mb[12:23]
+			#mach = mb[23:34]
+			#baro_alt_rate = mb[34:45]
+			#vert_vel = mb[45:56]
+
+		# 61 Extended squitter emergency/priority status  - bk decoded elsewhere
+		# 62 Reserved for target state and status information  - bk decoded elsewhere
+		# 63 Reserved for extended squitter
+		# 64 Reserved for extended squitter
+		# 65 Aircraft operational status - bk decoded elsewhere
+		# 66-6F Reserved for extended squitter
+		# 70-75 Reserved for future aircraft downlink parameters 
+		# 76-E0 Unassigned
+		# E1-E2 Reserved for Mode S BITE
+		# E3 Transponder type/part number
+		# E4 Transponder software revision number 
+		# E5 ACAS unit part number
+		# E6 ACAS unit software revision number
+		# E7-F0 Unassigned
+		# F1 Military applications 
+		# F2 Military applications
+		# F3-FD Unassigned
+		# FE Update Request
+		# FF Search Request
+		else:
+			print "unknown CommB register contents: %s" % mb
+
+
+	def DecodeDF16(self, pkt):
+		# Long ACAS air-to-air
+		# 112-bit packet
+		# FIXME - some of this decoding same as DF0
+		df = pkt[0:5].uint
+		vs = pkt[5:6].uint
+		sl = pkt[8:11].uint
+		ri = pkt[13:17].uint
+		# 2 spare bits
+		ac = pkt[19:32]
+		mv = pkt[32:88]
+		ap = pkt[88:112]
+
+		[alt, altStr] = self.AltitudeCode(ac)
+
+		if vs == 0:
+			vsStr = "Airborne"
+		else:
+			vsStr = "On Ground"
+
+		if sl == 0:
+			slStr = "ACAS not operating"
+		else:
+			slStr = "Sensitivity level %d" % (sl)
+
+		# fixme - these come in in sequential packets to describe both ACAS and max speed.  Fill these into two different vars
+		riStr = ""
+		if ri == 0:
+			acasStr = "No operating ACAS"
+		if ri >= 1:
+			acasStr = "Reserved"
+		if ri >= 2:
+			acasStr = "ACAS (resolution inhibited)"
+		if ri >= 3:
+			acasStr = "ACAS (vertical only)"
+		if ri >= 4:
+			acasStr = "ACAS (vert and horz)"
+		if ri >= 5 and ri <= 7:
+			acasStr = "Reserved"
+
+		# Decode MV message
+		# Fixme - this doesn't work since often this MV field will contain register contents that 
+		# was requested by the interrogator, and we have no idea which reigster it is.
+		# only sometimes will it contain 0x30 as the first byte, in which case it *might* be an ACAS
+		# message. But we don't know for sure since we're only listening to one side of the conversation.
+		#vds = mv[0:8].uint	# might be the BDS register number
+		#ara = mv[8:22]
+		#rac = mv[22:26]
+		#rat = mv[26:27].uint
+		#mte = mv[27:28].uint
+		#raStr = ""
+
+		# This might be BDS 3,0: ACAS active resolution advisory
+		#if vds == 0x30:
+
+			#if ara[0:1].uint == 0 and mte == 1:
+				# multiple threats
+				#raStr += "Multple-threat RA"
+				#if ara[1:2].uint == 1:
+					#raStr += ", Upward sense correction required"
+				#if ara[2:3].uint == 1:
+					#raStr += ", Positive climb required"
+				#if ara[3:4].uint == 1:
+					#raStr += ", Downward sense correction required"
+				#if ara[4:5].uint == 1:
+					#raStr += ", Positive descent required"
+				#if ara[5:6].uint == 1:
+					#raStr += ", Crossing required"
+				#if ara[6:7].uint == 1:
+					#raStr += ", Sense reversal"
+				# FIXME - decode ACAS III fields, next 6 bits
+
+			#elif ara[0:1].uint == 1:
+				## single threat
+				#if ara[1:2].uint == 1:
+					#raStr += "Corrective RA"
+				#else:
+					#raStr += "Preventive RA"
+				#if ara[2:3].uint == 1:
+					#raStr += ", Downward sense"
+				#else:
+					#raStr += ", Upward sense"
+				#if ara[3:4].uint == 1:
+					#raStr += ", Increased rate"
+				#if ara[4:5].uint == 1:
+					#raStr += ", Sense reversal"
+				#if ara[5:6].uint == 1:
+					#raStr += ", Altitude crossing"
+				#if ara[6:7].uint == 1:
+					#raStr += ", RA positive"
+				#else:
+					#raStr += ", vertical speed limit"
+				## FIXME - decode ACAS III fields, next 6 bits
+			
+			#else:
+				## no threat, no RA
+				#pass
+
+			#if rac[0:1].uint == 1:
+				#raStr += ",  Do not pass below"
+			#if rac[1:2].uint == 1:
+				#raStr += ",  Do not pass above"
+			#if rac[2:3].uint == 1:
+				#raStr += ",  Do not turn left"
+			#if rac[3:4].uint == 1:
+				#raStr += ",  Do not turn right"
+
+			#if rat == 1:
+				#raStr += ", RA terminated"
+
+		##elif vds == 0x60:
+			## BDS 6,0
+			## Heading and Speed Report
+			## Magnetic heading (units 90/512 degrees, -180 to +180 deg) 11 bits
+			## Indicated Airspeed (units 1kt, 0 to 1023 knots) 10 bits
+			# Mach (units 0.004 mach, 0 to 4.09 mach) 10 bits
+			# Barometric Altitude rate (units 32 ft/min, -6384 to 16352 ft/min) 9+x bits?
+			# Intertial vertical velocity (units 32 ft/min, -6384 to 16352 ft/min) 9+x bits?
+			#print "FIXME - DF16: BDS register 0x%x = 0x%x" % (vds, mv[8:].uint)
+		#else:
+			#print "FIXME - DF16: BDS register 0x%x = 0x%x" % (vds, mv[8:].uint)
+
+		crc = self.calcParity(pkt[0:88])
+		aa = crc ^ ap;	
+		a = self.lookupAircraft(aa.uint)
+		if (a != None):
+			# AA exists in roll-call list so CRC must have been good
+			crcStr = "Aircraft ID %x." % (aa.uint)
+			a.setACASInfo(None, alt, riStr, acasStr, vsStr)
+			self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
+			self.stats.goodPkts += 1
+		else:
+			crcStr = "CRC error or no all-call received yet from ID %x." % (aa.uint)
+			self.stats.CrcErrs += 1
+		#print "  DF%u (Long Air-to-Air ACAS): Aircraft ID %03hx. %d ft. %s. %s. %s" % (df, aa.uint, alt, vsStr, acasStr, crcStr)
+		self.logMsg("  DF%u (Long Air-to-Air ACAS): Aircraft ID %03hx. %d ft. %s. %s. %s" % (df, aa.uint, alt, vsStr, acasStr, crcStr))
+	
 
 	# "TYPE" subcode fields are the same for DF17 and DF18
 	def DecodeCommon_DF17_DF18(self, pkt):
@@ -398,11 +674,16 @@ class AdsbDecoder(QObject):
 		st = me[5:8].uint	# subtype
 
 		# check parity, flag if bad
+		# replies to interrogators XOR their IIC and SI with the last 7 bits of the CRC	
 		crc = self.calcParity(pkt[0:88])
-		if crc == pi:
+		(good, ic, cl, broadcastStr) = self.checkParityInterrogator(pi, crc)
+
+		if good:
 			crcgood = True
 			errStr = ""
 			self.stats.goodPkts += 1
+			if cl == 0:			# IC is the IIC
+				self.stats.IICSeen[ic] = True
 		else:
 			crcgood = False
 			errStr = "CRC error (expected %x, rx %x)." % (crc.uint, pi.uint)
@@ -490,6 +771,8 @@ class AdsbDecoder(QObject):
 				if nonIcaoFlag:
 					a.setFakeICAO24(True)
 				a.setIdentityInfo(id, catStr)
+				if cl == 0:
+					a.setIICSeen(ic)
 				logStr = "Identifier: %s, %s." % (id, catStr)
 				self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
 			
@@ -513,6 +796,8 @@ class AdsbDecoder(QObject):
 				if nonIcaoFlag:
 					a.setFakeICAO24(True)
 				a.setGroundPos(lat, lon, velStr, caStr)
+				if cl == 0:
+					a.setIICSeen(ic)
 				logStr = "%s CPR: %u, %u %s. %s." % ("Odd" if oddeven else "Even", cprlat, cprlong, posStr, velStr)
 				self.emit(SIGNAL("updateAircraftPosition(PyQt_PyObject)"), a)
 			
@@ -551,6 +836,8 @@ class AdsbDecoder(QObject):
 				if nonIcaoFlag:
 					a.setFakeICAO24(True)
 				a.setAirbornePos(lat, lon, alt, posUncertStr, altTypeStr, caStr)
+				if cl == 0:
+					a.setIICSeen(ic)
 				logStr = "%s CPR: %u, %u %s. %s." % ("Odd" if oddeven else "Even", cprlat, cprlong, posStr, ssStr)
 				self.emit(SIGNAL("updateAircraftPosition(PyQt_PyObject)"), a)
 
@@ -643,12 +930,14 @@ class AdsbDecoder(QObject):
 				if nonIcaoFlag:
 					a.setFakeICAO24(True)
 				a.setAirborneVel(velStr, heading, vertStr, caStr)		# fixme add diff, true/magnetic
+				if cl == 0:
+					a.setIICSeen(ic)
 				logStr = "Heading %s. %s. %s." %  (headingStr, velStr, vertStr)
 				self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
 
 		elif tc == 28:
 			# Emergency/Priority status or TCAS RA broadcast
-			# contents of register 61
+			# contents of register BDS 6,1
 			st = me[5:8].uint
 			if st == 1:
 				# Emergency/Priority status and Mode A
@@ -665,13 +954,14 @@ class AdsbDecoder(QObject):
 					if nonIcaoFlag:
 						a.setFakeICAO24(True)
 					a.setEmergStatus(squawk, esStr)
+					if cl == 0:
+						a.setIICSeen(ic)
 					logStr = "Squawk %u. %s." %  (squawk, esStr)
 					self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
 
 			elif st == 2:
 				# TCAS RA Broadcast.  See Annex 10, 4.3.8.4.2.2
-				# subtype 1 is contents of register 30
-				ara = me[8:22]
+				# subtype 1 is contents of register BDS 3,0
 				rac = me[22:26]
 				ra_term = me[26:27].uint
 				multiple = me[27:28]
@@ -774,8 +1064,13 @@ class AdsbDecoder(QObject):
 						a = self.recordAircraft(aa)
 					if nonIcaoFlag:
 						a.setFakeICAO24(True)
+					if cl == 0:
+						a.setIICSeen(ic)
 					#FIXME - Store TCAS RA
-					logStr =  "%s. %s. %s" %  (threatStr, rangeStr, racStr)
+					#log in separate window by timestamp, AA, thread ID, threatStr, rangeStr
+					#snapshot other data at that time: position, alt, airspeed, heading, target alt, 
+					#keep logging until RA is terminated.
+					logStr =  "Aircraft ID %s. %s. %s. %s" %  (aaStr, threatStr, rangeStr, racStr)
 					print "FIXME - DF17/DF18 %s" % (logStr)
 				
 			else:
@@ -783,8 +1078,7 @@ class AdsbDecoder(QObject):
 
 		elif tc == 29:
 			# Target State and Status
-			# subtype 1 is contents of register 62
-			# emergency codes: 7500, 7600 or 7700
+			# subtype 1 is contents of register BDS 6,2
 			st = me[5:7].uint
 			if st == 0:
 				vert = me[7:9].uint
@@ -838,14 +1132,14 @@ class AdsbDecoder(QObject):
 				if approachMode:
 					targStr += "Approach Mode. "
 				
-				#print "DF%u Target Status: %s, %s, %s Stat=%u, Sign=%u, head=%u, nacp=%u, altselValid=%u, vnav=%u, altHold=%u, adsr=%u, approachMode=%u, tcas=%u, autopilot=%u" % (df, altStr, baroStr, targStr, stat, sign, head, nacp, altselValid, vnav, altHold, adsr, approachMode, tcas, autopilot);
-
 				if crcgood:
 					a = self.lookupAircraft(aa)
 					if a == None:
 						a = self.recordAircraft(aa)
 					if nonIcaoFlag:
 						a.setFakeICAO24(True)
+					if cl == 0:
+						a.setIICSeen(ic)
 					# FIXME - update aircraft
 					logStr =  "%s. %s. %s" %  (altStr, baroStr, targStr)
 					print "FIXME - DF17/DF18 %s" % (logStr)
@@ -855,7 +1149,7 @@ class AdsbDecoder(QObject):
 		
 		
 		elif tc == 31:
-			# Aircraft operational status, register 65
+			# Aircraft operational status, register BDS 6,5
 			st = me[5:8].uint
 			ver = me[40:43].uint
 			hrd = me[53:54].uint
@@ -893,6 +1187,8 @@ class AdsbDecoder(QObject):
 						a = self.recordAircraft(aa)
 					if nonIcaoFlag:
 						a.setFakeICAO24(True)
+					if cl == 0:
+						a.setIICSeen(ic)
 					logStr =  "Version %u. %s. %s." %  (ver, ccStr, omStr)
 					print "FIXME - DF17/DF18 %s" % (logStr)
 					# FIXME emit signal
@@ -902,7 +1198,7 @@ class AdsbDecoder(QObject):
 		else:
 			print "need decoder for DF%u, type %u:" % (df, tc), self.ba2hex(pkt)
 
-		return [ df, tcStr, aaStr, nonIcaoStr, logStr, errStr ]
+		return [ df, ic, tcStr, aaStr, nonIcaoStr, logStr, errStr ]
 
 
 	# DF 18 uses the CF/IMF to denote non-ICAO AA.  
@@ -935,439 +1231,12 @@ class AdsbDecoder(QObject):
 		if len(pkt) < 112:
 			print "short DF17 pkt"
 			return
-		# new
-		[ df, tcStr, aaStr, nonIcaoStr, logStr, errStr ] = self.DecodeCommon_DF17_DF18(pkt)
-		self.logMsg("  DF%u (Extended Squitter): %s Aircraft ID %s. %s %s" % (df, tcStr, aaStr, logStr, errStr))
+		[ df, ic, tcStr, aaStr, nonIcaoStr, logStr, errStr ] = self.DecodeCommon_DF17_DF18(pkt)
+		self.logMsg("  DF%u (Extended Squitter): %s Aircraft ID %s. IIC %d. %s %s" % (df, tcStr, aaStr, ic, logStr, errStr))
 		return
-
-		#old
-		posStr = ""
-		logStr = ""
-		# 112-bit packet
-		# fixme - decode ca, me, lookup ICAO24
-		df = pkt[0:5].uint
-		ca = pkt[5:8].uint
-		aa = pkt[8:32].uint
-		me = pkt[32:88]
-		pi = pkt[88:112]
-		tc = me[0:5].uint	# type code (9 to 18 are position of various accuracies)
-					# 5 to 8 are ground position
-					# 0 is barometric alt only
-					# 20 to 22 is position, using GPS altitude
-		st = me[5:8].uint	# subtype
-		crc = self.calcParity(pkt[0:88])
-		caStr = self.capabilitiesStr(ca)
-		if crc == pi:
-			crcgood = True
-			errStr = ""
-			self.stats.goodPkts += 1
-		else:
-			crcgood = False
-			errStr = "CRC error (expected %x, rx %x)." % (crc.uint, pi.uint)
-			self.stats.CrcErrs += 1
-
-		if aa == 0x555555:
-			aaStr = "Anonymous"
-		else:
-			aaStr = "%hx" % (aa)
-			
-		posUncertStr = ""
-
-		tcStr = self.typeCodeStrDF17_18(tc)
-
-
-		if tc >= 1 and tc <=4:
-			# Aircraft Identification String BDS0,8
-			cat = me[5:8].uint
-			# fixme - these decode differently for TC1,2,3
-			catStr = ""
-			if cat == 0:
-				catStr = "A/C category unavailable"
-			elif cat == 1:
-				catStr = "Light weight <15K pounds"
-			elif cat == 2:
-				catStr = "Medium weight <75K pounds"
-			elif cat == 3:
-				catStr = "Medium weight <300K pounds"
-			elif cat == 4:
-				catStr = "Strong vortex aircraft"
-			elif cat == 5:
-				catStr = "Heavy weight >300K pounds"
-			elif cat == 6:
-				catStr = "High performance, high speed"
-			elif cat == 7:
-				catStr = "Rotorcraft"
-			else:
-				catStr = "Category %u" % (cat)
-			id = self.decodeChars(me[8:56])
-			if crcgood:
-				a = self.lookupAircraft(aa)
-				if a == None:
-					a = self.recordAircraft(aa)
-				a.setIdentityInfo(id, catStr)
-				logStr = "Identifier: %s, %s." % (id, catStr)
-				self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
-			
-		elif tc >=5 and tc <=8:
-			# Surface position BDS0,6
-			movement = me[5:12].uint
-			gtv = me[12:13].uint
-			track = me[13:20].uint
-			timesync = me[20:21].uint
-			oddeven = me[21:22].uint
-			cprlat = me[22:39].uint
-			cprlong = me[39:56].uint
-			[lat, lon] = self.decodeCPR(cprlong, cprlat, 17, 90, oddeven)
-			posStr = "at (%f, %f)" % (lat, lon)
-			[vel, velStr] = self.decodeMovement(movement)
-			if crcgood:
-				# store aa, ONGROUND, posStr, moveStr
-				a = self.lookupAircraft(aa)
-				if a == None:
-					a = self.recordAircraft(aa)
-				a.setGroundPos(lat, lon, velStr, caStr)
-				logStr = "%s CPR: %u, %u %s. %s." % ("Odd" if oddeven else "Even", cprlat, cprlong, posStr, velStr)
-				self.emit(SIGNAL("updateAircraftPosition(PyQt_PyObject)"), a)
-			
-		elif tc >=9 and tc <=22 and tc != 19:	
-			# Airborne position BDS0,5
-			ss = me[5:7].uint		# fime decode per (A.2.3.2.6)
-			ant = me[7:8].uint		# fixme (A.2.3.2.5)
-			ac = me[8:20]
-			if tc >= 20 and tc <= 22:
-				alt = ac.uint				# GPS HAE (fixme - units?)
-				altStr = "%d units?" % (alt)
-				altTypeStr =  "GPS HAE"
-			else:
-				# m bit is omitted, add it back
-				ac = ac[0:6] + bitstring.BitArray(bin='0') + ac[6:12] 	
-				[alt, altStr] = self.AltitudeCode(ac)	# barometric
-				altTypeStr =  "barometric"
-			timesync = me[20:21].uint
-			oddeven = me[21:22].uint
-			cprlat = me[22:39].uint
-			cprlong = me[39:56].uint
-			[lat, lon] = self.decodeCPR(cprlong, cprlat, 17, 360, oddeven)
-			posStr = "at (%f, %f)" % (lat, lon)
-			if crcgood:
-				# store aa, AIRBORNE, posStr, altStr, posUncertStr, altTypeStr
-				a = self.lookupAircraft(aa)
-				if a == None:
-					a = self.recordAircraft(aa)
-				a.setAirbornePos(lat, lon, alt, posUncertStr, altTypeStr, caStr)
-				logStr = "%s CPR: %u, %u %s." % ("Odd" if oddeven else "Even", cprlat, cprlong, posStr)
-				self.emit(SIGNAL("updateAircraftPosition(PyQt_PyObject)"), a)
-
-		elif tc == 19:
-			# Airborne velocity BDS0,9
-			st1 = me[5:8].uint
-			st2 = me[8:11].uint
-			icf = me[8:9].uint
-			ifr = me[9:10].uint
-			nuc = me[10:13].uint
-			west = me[13:14]
-			vel_ew = me[14:24].uint - 1
-			south = me[24:25]
-			vel_ns = me[25:35].uint - 1
-			baro = me[35:36]
-			down = me[36:37]
-			vrate = me[37:46].uint
-
-			if st1 == 2 or st1 == 4:
-				vel_ew *= 4
-				vel_ns *= 4
-			if west:
-				vel_ew *= -1
-			if south: 
-				vel_ns *= -1
-
-			vel = math.sqrt(math.pow(vel_ew, 2) + math.pow(vel_ns, 2))
-			heading = math.atan2(vel_ew, vel_ns) / math.pi * 180
-			if heading < 0:
-				heading += 360
-
-			if vel == 0:
-				velStr = "Speed unavailable"
-			elif st1 == 1 or st1 == 2:
-				velStr = "Ground speed %u kts" % vel
-			elif st1 == 3 or st1 == 4:
-				velStr = "Airspeed %u kts" % vel
-			else:
-				velStr = "Reserved"
-			
-			if vrate == 0:
-				vertStr = "Vertical rate unavailable"
-			else:	
-				if down:
-					vrate *= -1;
-				vertStr = "%d ft/min" % (vrate*64)
-				if baro:
-					vertStr += " (barometric)"
-				else:
-					vertStr += " (GPS)"
-
-			if crcgood:
-				# store aa, velStr, heading, vertStr
-				a = self.lookupAircraft(aa)
-				if a == None:
-					a = self.recordAircraft(aa)
-				a.setAirborneVel(velStr, heading, vertStr, caStr)
-				logStr = "Heading %u. %s. %s." %  (heading, velStr, vertStr)
-				self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
-
-		elif tc == 28:
-			# Emergency/Priority status or TCAS RA broadcast
-			# contents of register 61
-			st = me[5:8].uint
-			if st == 1:
-				# Emergency/Priority status and Mode A
-				es = me[8:11].uint
-				modea = me[11:24]
-				res = me[24:56]
-				esStr = self.decodeEmergencyStatus(es)
-				squawk = self.squawkDecode(modea)
-
-				if crcgood:
-					a = self.lookupAircraft(aa)
-					if a == None:
-						a = self.recordAircraft(aa)
-					a.setEmergStatus(squawk, esStr)
-					logStr = "Squawk %u. %s." %  (squawk, esStr)
-					self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
-
-			elif st == 2:
-				# TCAS RA Broadcast.  See Annex 10, 4.3.8.4.2.2
-				# subtype 1 is contents of register 30
-				ara = me[8:22]
-				rac = me[22:26]
-				ra_term = me[26:27].uint
-				multiple = me[27:28]
-				tti = me[28:30].uint
-				identity = me[30:56]
-		
-				if multiple:
-					threatStr = "Multiple threats"
-					if ra_term:
-						threatStr += " (terminated)"
-				elif not ara[0:1]:
-					threatStr = "No threats"
-				else:
-					threatStr = "Single threat"
-					if ra_term:
-						threatStr += " (terminated)"
-
-				if ara[0:1]:
-					threatStr += ". RA is "
-					if ara[1:2]:
-						threatStr += "corrective, "
-					else:
-						threatStr += "preventative, "
-					if ara[2:3]:
-						threatStr += "downward, "
-					else:
-						threatStr += "upward, "
-					if ara[3:4]:
-						threatStr += "increased rate, "
-					if ara[4:5]:
-						threatStr += "sense reversal, "
-					if ara[5:6]:
-						threatStr += "altitude crossing, "
-					if ara[6:7]:
-						threatStr += "positive, "
-					else:
-						threatStr += "vert limit, "
-					if ara[7:15]:
-						threatStr += "ACAS 3, "
-
-				elif multiple:
-					if ara[1:2]:
-						threatStr += "upward correction, "
-					if ara[2:3]:
-						threatStr += "positive climb, "
-					if ara[3:4]:
-						threatStr += "downward correction, "
-					if ara[4:5]:
-						threatStr += "positive descend, "
-					if ara[5:6]:
-						threatStr += "crossing, "
-					if ara[6:7]:
-						threatStr += "sense reversal, "
-					if ara[7:15]:
-						threatStr += "ACAS 3, "
-				threatStr.strip(", ") 		# strip trailing comma
-				threatStr += "."
-
-				racStr = ""
-				if rac[0:1]:
-					racStr += "Do not pass below"
-				if rac[1:2]:
-					if len(racStr) > 0:
-						racStr += ", "
-					racStr += "Do not pass above"
-				if rac[2:3]:
-					if len(racStr) > 0:
-						racStr += ", "
-					racStr += "Do not turn left"
-				if rac[3:4]:
-					if len(racStr) > 0:
-						racStr += ", "
-					racStr += "Do not turn right"
-				if len(racStr) > 0:
-					racStr += "."
-	
-				aid = 0
-				rangeStr = ""
-				if tti == 1:
-					aid = identity[0:24].uint				# mode S aircraft ID
-					rangeStr = "Threat ID: %hx" % (aid)
-				elif tti == 2:
-					[alt, altStr] = self.AltitudeCode(identity[0:13])	# altitude of threat
-					tidr = identity[13:20].uint
-					tidb = identity[20:26].uint
-					if tidr == 0:
-						rangeStr = "Range unavailable. "
-					elif tidr == 127:
-						rangeStr = "Range > 12.6 NM. "
-					else:
-						rangeStr = "Range %.1f NM. " % ((tidr-1)/10.0)
-					if tidb == 0:
-						rangeStr += "Bearing unavailable"
-					else:
-						rangeStr += "Bearing %u to %u" % (6*(tidb-1), 6*tidb)
-
-				if crcgood:
-					a = self.lookupAircraft(aa)
-					if a == None:
-						a = self.recordAircraft(aa)
-					#print "FIXME - Store TCAS RA"  
-					logStr =  "%s. %s. %s" %  (threatStr, rangeStr, racStr)
-
-				print "DF17 - bk:", logStr
-				
-			else:
-				print "need decoder for DF%u, type %u, subtype %u:" % (df, tc, st), self.ba2hex(pkt)
-
-		elif tc == 29:
-			# Target State and Status
-			# subtype 1 is contents of register 62
-			# emergency codes: 7500, 7600 or 7700
-			st = me[5:7].uint
-			if st == 0:
-				vert = me[7:9].uint
-				alt_t = me[9:10].uint
-				alt_cap = me[11:13].uint
-				vmode = me[13:15].uint
-				alt = me[15:25].uint
-				horz = me[25:27].uint
-				head = me[27:36].uint
-				head_track = me[36:37].uint
-				hmode = me[37:39].uint
-				nacp = me[39:43].uint
-				nacbaro = me[43:44].uint
-				sil = me[44:46].uint
-				cap = me[51:53].uint
-				es = me[53:56].uint
-				esStr = self.decodeEmergencyStatus(es)
-				print "FIXME - DF%u Target Status: %s, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u" % (df, esStr, vert, alt_t, alt_cap, vmode, alt, horz, head, head_track, hmode, nacp, nacbaro, sil, cap)
-				
-			elif st == 1:
-				altsel = me[8:9].uint
-				alt = me[9:20].uint
-				baro = me[20:29].uint	
-				stat = me[29:30].uint
-				sign = me[30:31].uint	
-				head = me[31:39].uint
-				nacp = me[39:43].uint
-				altselValid = me[46:47].uint
-				autopilot = me[47:48].uint
-				vnav = me[48:49].uint
-				altHold = me[49:50].uint
-				adsr = me[50:51].uint
-				approachMode = me[51:52].uint
-				tcas = me[52:53].uint
-
-				targStr = ""
-				if alt == 0:
-					altStr = "Unknown altitude target"
-				else:
-					altStr = "%u ft target" % ((alt-1)*32)
-
-				if baro == 0:
-					baroStr = "Unknown"
-				else:
-					baroStr = "%.1f mbar" % (0.8*(baro-1)+800)
-
-				if autopilot:
-					targStr += "Autopilot engaged. "
-				if altHold:
-					targStr += "Altitude Hold. "
-				if approachMode:
-					targStr += "Approach Mode. "
-				
-				#print "DF%u Target Status: %s, %s, %s Stat=%u, Sign=%u, head=%u, nacp=%u, altselValid=%u, vnav=%u, altHold=%u, adsr=%u, approachMode=%u, tcas=%u, autopilot=%u" % (df, altStr, baroStr, targStr, stat, sign, head, nacp, altselValid, vnav, altHold, adsr, approachMode, tcas, autopilot);
-
-				if crcgood:
-					a = self.lookupAircraft(aa)
-					if a == None:
-						a = self.recordAircraft(aa)
-					logStr =  "%s. %s. %s" %  (altStr, baroStr, targStr)
-					print "FIXME - DF17 %s" % (logStr)
-
-			else:
-				print "need decoder for DF%u, type %u, subtype %u:" % (df, tc, st), self.ba2hex(pkt)
-		
-		
-		elif tc == 31:
-			# Aircraft operational status, register 65
-			st = me[5:8].uint
-			ver = me[40:43].uint
-			hrd = me[53:54].uint
-			ccStr = ""
-			omStr = ""
-			if st == 0:
-				cc = me[8:24]
-				om = me[24:40]
-				ccStr = "Capabilities: "
-				if cc[0:2].uint == 0 and cc[2:3]:
-					ccStr += "TCAS, "
-				if cc[0:2].uint == 0 and cc[3:4]:
-					ccStr += "Ext Squitter Rx, "
-				if cc[0:2].uint == 0 and cc[6:7]:
-					ccStr += "Air-reference velocity report, "
-				if cc[0:2].uint == 0 and cc[7:8]:
-					ccStr += "Target-state report, "
-				if cc[0:2].uint == 0 and cc[8:10]:
-					ccStr += "Target-change report, "
-				if cc[0:2].uint == 0 and cc[10:11]:
-					ccStr += "UAT Rx, "
-				ccStr.strip(", ")					# remove trailing comma
-
-				if om[0:2].uint == 0 and om[2:3]:
-					omStr += "TCAS RA active, "			# fixme - this should be indicated in table
-				if om[0:2].uint == 0 and om[3:4]:
-					omStr += "IDENT active, "			# fixme - this should be indicated in table
-				if om[0:2].uint == 0 and om[5:6]:
-					omStr += "Single antenna, "			# fixme - this should be indicated in table
-				omStr.strip(", ")					# remove trailing comma
-
-				if crcgood:
-					a = self.lookupAircraft(aa)
-					if a == None:
-						a = self.recordAircraft(aa)
-					logStr =  "Version %u. %s. %s." %  (ver, ccStr, omStr)
-					# FIXME emit signal
-
-			else:
-				print "need decoder for DF%u, type %u, subtype %u:" % (df, tc, st), self.ba2hex(pkt)
-		else:
-			print "need decoder for DF%u, type %u:" % (df, tc), self.ba2hex(pkt)
-
-		self.logMsg("  DF%u (Extended Squitter): %s Aircraft ID %s. %s %s" % (df, tcStr, aaStr, logStr, errStr))
-		#print("  DF%u (Extended Squitter): %s Aircraft ID %s. %s %s" % (df, tcStr, aaStr, logStr, errStr))
 
 
 	def DecodeDF18(self, pkt):
-		# new
 		if len(pkt) < 112:
 			print "short DF18 pkt"
 			return
@@ -1376,162 +1245,6 @@ class AdsbDecoder(QObject):
 		self.logMsg("  DF%u (TIS-B): %s Aircraft ID %s%s. %s %s" % (df, tcStr, aaStr, nonIcaoStr, logStr, errStr))
 		return
 
-		#old
-		# 112-bit packet
-		df = pkt[0:5].uint
-		cf = pkt[5:8].uint
-		aa = pkt[8:32].uint
-		me = pkt[32:88]
-		pi = pkt[88:112]
-		tc = me[0:5].uint	# type code - same as DF17?
-
-		if len(pkt) < 112:
-			print "short DF18 pkt"
-			return
-
-		aaStr = "%hx" % (aa)
-		crc = self.calcParity(pkt[0:88])
-		if crc == pi:
-			crcgood = True
-			self.stats.goodPkts += 1
-		else:
-			crcgood = False
-			self.stats.CrcErrs += 1
-	
-		tcStr = self.typeCodeStrDF17_18(tc)
-
-		#print " DF%u (TIS-B): Aircraft ID %s. CF=%u, TC=%u %s" % (df, aaStr, cf, tc, tcStr)
-
-		# FIXME - isn't TYPE/Subtype decoding the same as DF17 decoding?  Can't we use common code?
-		#if tc >=9 and tc <=22 and tc != 19:	
-		if tc == 13:
-			# TIS-B Fine Airborne Position 
-			ss = me[5:7].uint
-			imf = me[7:8].uint	# ICAO/Mode A flag
-			if ss == 1:
-				ssStr = "Emergency Alert"
-			elif ss == 2:
-				ssStr = "Temporary Alert"
-			elif ss == 3:
-				ssStr = "SPI condition"
-			else:
-				ssStr = ""
-			ac = me[8:20]
-			oddeven = me[21:22].uint
-			# m bit is omitted, add it back
-			ac = ac[0:6] + bitstring.BitArray(bin='0') + ac[6:12] 	
-			[alt, altStr] = self.AltitudeCode(ac)	# barometric
-			altTypeStr =  "barometric"
-			cprlat = me[22:39].uint
-			cprlong = me[39:56].uint
-			[lat, lon] = self.decodeCPR(cprlong, cprlat, 17, 360, oddeven)
-			posStr = "at (%f, %f)" % (lat, lon)
-
-			if crcgood:
-				# store aa, AIRBORNE, posStr, altStr, posUncertStr, altTypeStr
-				# CF == 5, then the AA is fake (unique, but not ICAO registered)
-				a = self.lookupAircraft(aa)
-				if a == None:
-					a = self.recordAircraft(aa)
-				a.setAirbornePos(lat, lon, alt, "", altTypeStr, "")
-				if cf == 1:
-					a.setFakeICAO24(True)
-				if cf == 2 and imf == 1:		# fixme - Mode A code and track number
-					a.setFakeICAO24(True)
-				if cf == 3 and imf == 1:		# fixme - Mode A code and track number
-					a.setFakeICAO24(True)
-				if cf == 4:				# fixme -  TIS-B service volume ID 
-					a.setFakeICAO24(True)
-				if cf == 5 and imf == 0:		
-					a.setFakeICAO24(True)
-				self.emit(SIGNAL("updateAircraftPosition(PyQt_PyObject)"), a)
-
-			#print(" DF%u (TIS-B): Aircraft ID %s. CF=%u, IMF=%u, TC=%u, SS=%u %s, %s %s, odd=%u, %s" % \
-				#(df, aaStr, cf, imf, tc, ss, ssStr, altStr, altTypeStr, oddeven, posStr))
-			self.logMsg(" DF%u (TIS-B): Aircraft ID %s. CF=%u, IMF=%u, TC=%u, SS=%u %s, %s %s, odd=%u, %s" % \
-				(df, aaStr, cf, imf, tc, ss, ssStr, altStr, altTypeStr, oddeven, posStr))
-		elif tc == 19:
-			# TIS-B Velocity 
-			subtype = me[5:8].uint
-			imf = me[8:9].uint	# ICAO/Mode A flag
-			nacp = me[9:13].uint
-			geo = me[35:36]
-			down = me[36:37]
-			vrate = me[37:46].uint
-			nic = me[47:48]
-
-			if subtype == 1 or subtype == 2:
-				# ground referenced velocity
-				west = me[13:14]
-				vel_ew = me[14:24].uint - 1
-				south = me[24:25]
-				vel_ns = me[25:35].uint - 1
-				if subtype == 2:
-					vel_ew *= 4		
-					vel_ns *= 4
-				if west:
-					vel_ew *= -1
-				if south: 
-					vel_ns *= -1
-
-				vel = math.sqrt(math.pow(vel_ew, 2) + math.pow(vel_ns, 2))
-				heading = math.atan2(vel_ew, vel_ns) / math.pi * 180
-				if heading < 0:
-					heading += 360
-				headingStr = "%u deg True" % heading
-
-			elif subtype == 2 or subtype == 4:
-				# air referenced velocity
-				heading_valid = me[13:14]
-				heading = me[14:24].uint
-				heading = 360.0 * heading / 1024	#units of 360/1024
-				if heading_valid == False:
-					heading = 0
-				mag_heading = me[54:55]
-				if mag_heading:
-					headingStr = "%u deg Magnetic" % heading
-				else:
-					headingStr = "%u deg True" % heading
-				vel = me[25:35].uint - 1
-				if subtype == 4:
-					vel *= 4
-
-			if vel == 0:
-				velStr = "Speed unavailable"
-			elif subtype == 3 or subtype == 4:
-				velStr = "Airspeed %u kts" % vel
-			else:
-				velStr = "Ground speed %u kts" % vel
-			
-			if vrate == 0:
-				vertStr = "Vertical rate unavailable"
-			else:	
-				if down:
-					vrate *= -1;
-				vertStr = "%d ft/min" % (vrate*64)
-
-			if crcgood:
-				# store aa, velStr, heading, vertStr
-				a = self.lookupAircraft(aa)
-				if a == None:
-					a = self.recordAircraft(aa)
-				caStr = ""
-				a.setAirborneVel(velStr, heading, vertStr, caStr)
-				if cf == 5 and imf == 0:
-					a.setFakeICAO24(True)
-				self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
-
-			accStr = self.decodeNavAccuracy(nacp)
-			#print( " DF%u (TIS-B): Aircraft ID %s. CF=%u, IMF=%u, TC=%u, NACP=%u %s, %s, %s, heading: %s" % \
-				#(df, aaStr, cf, imf, tc, nacp, accStr, velStr, vertStr, headingStr))
-			self.logMsg( " DF%u (TIS-B): Aircraft ID %s. CF=%u, IMF=%u, TC=%u, NACP=%u %s, %s, %s, heading: %s" % \
-				(df, aaStr, cf, imf, tc, nacp, accStr, velStr, vertStr, headingStr))
-
-		else:
-			self.logMsg(" DF%u (TIS-B): Aircraft ID %s. CF=%u, TC=%u" % (df, aaStr, cf, tc))
-			print "Need decoder for DF18, CF %u, type %u:" % (cf, tc), self.ba2hex(pkt)
-			
-			
 	def decodeSurveillanceStatus(self, ss):
 		if ss == 1:
 			ssStr = "Emergency Alert"
@@ -1547,15 +1260,15 @@ class AdsbDecoder(QObject):
 		if es == 0:
 			esStr = "No emergency"
 		elif es == 1:
-			esStr = "General emergency"
+			esStr = "General emergency (7700)"
 		elif es == 2:
 			esStr = "Medical emergency"
 		elif es == 3:
 			esStr = "Minimum-fuel emergency"
 		elif es == 4:
-			esStr = "No-communications emergency"
+			esStr = "No-communications emergency (7600)"
 		elif es == 5:
-			esStr = "Unlawful interference emergency"
+			esStr = "Unlawful interference emergency (7500)"
 		elif es == 6:
 			esStr = "Downed-aircraft emergency"
 		elif es == 7:
@@ -1699,7 +1412,7 @@ class AdsbDecoder(QObject):
 	# Nb = 17 for airborne, 14 for intent, and 12 for TIS-B
 	# odd is True for odd packet, False for even
 	# range is 360.0 deg for airborne format, 90.0 deg for surface format
-	# fixme - the ODD packet seems to decode incorrectly... I think fixed.  No, still problem for some A/C
+	# fixme - the ODD packet seems to decode incorrectly... still a problem for some A/C
 	def decodeCPR(self, xz, yz, nbits, _range, odd):
 		# refer to C.2.6.5 and C.2.6.6
 		nz = 15		# number of latitude zones (fixed)
@@ -1742,6 +1455,7 @@ class AdsbDecoder(QObject):
 		return nl;
 
 	def DecodeDF20(self, pkt):
+		# Comm-B altitude reply
 		# 112-bit packet
 		if len(pkt) < 112:
 			print "short DF20 packet"
@@ -1751,7 +1465,7 @@ class AdsbDecoder(QObject):
 		dr = pkt[8:13].uint
 		um = pkt[13:20]
 		ac = pkt[19:32]
-		#mb = pkt[32:88].uint
+		mb = pkt[32:88]		# we can't decode this since we don't know which register it is
 		ap = pkt[88:112]
 		iis = um[0:4].uint
 		fsStr = self.flightStatusStr(fs)
@@ -1769,18 +1483,18 @@ class AdsbDecoder(QObject):
 		else:
 			crcStr = "CRC error or no all-call received yet from ID %x." % (aa.uint)
 			self.stats.CrcErrs += 1
-		#print "  DF%u (Comm-B Altitude Reply): IID=%u. %s. %s. %s ap=%x. %s" % (df, iis, altStr, fsStr, drStr, ap.uint, crcStr)
 		self.logMsg("  DF%u (Comm-B Altitude Reply): IID=%u. %s. %s. %s. %s" % (df, iis, altStr, fsStr, drStr, crcStr))
 
 		
 	def DecodeDF21(self, pkt):
+		# Comm-B identity reply
 		# 112-bit packet
 		df = pkt[0:5].uint
 		fs = pkt[5:8].uint
 		dr = pkt[8:13].uint
 		um = pkt[13:20]
 		id = pkt[19:32]
-		#mb = pkt[32:88].uint
+		mb = pkt[32:88]		# we can't decode this since we don't know which register it is
 		ap = pkt[88:112]
 		iis = um[0:4].uint
 		fsStr = self.flightStatusStr(fs)
@@ -1801,7 +1515,6 @@ class AdsbDecoder(QObject):
 		else:
 			crcStr = "CRC error or no all-call received yet from ID %x." % (aa.uint)
 			self.stats.CrcErrs += 1
-		#print "  DF%u (Comm-B Identity Reply): IID=%u. Squawk %04u. %s. %s %s" % (df, iis, squawk, fsStr, drStr, crcStr)
 		self.logMsg("  DF%u (Comm-B Identity Reply): IID=%u. Squawk %04u. %s. %s %s" % (df, iis, squawk, fsStr, drStr, crcStr))
 
 		
@@ -1812,7 +1525,6 @@ class AdsbDecoder(QObject):
 			print "Bad length %u for AltitudeCode!" % (len(ac))
 			return [-1, "Bad Altitude Code" ];
 		if ac.uint == 0:
-			#print "altitude not available"
 			return [-1, "Altitude not available" ];
 		alt = 0
 		m = ac[26-20]		# feet(0) or meters(1)
@@ -1837,7 +1549,6 @@ class AdsbDecoder(QObject):
 		elif q == 0:
 			# m = 0, q = 0
 			# mode c encoding - gillham code
-			#print "mode c altitude encoding"
 			c1 = ac[20-20]
 			a1 = ac[21-20]
 			c2 = ac[22-20]
@@ -1851,7 +1562,6 @@ class AdsbDecoder(QObject):
 			d2 = ac[30-20]
 			b4 = ac[31-20]
 			d4 = ac[32-20]
-			#print (d1, d2, d4, a1, a2, a4, b1, b2, b4, c1, c2, c4)
 			code = bitstring.BitArray([d2, d4, a1, a2, a4, b1, b2, b4, c1, c2, c4])
 			alt = self.modeCtoAltitude(code.uint)
 			return [alt, "%d ft (mode c encoding)" % (alt)]
@@ -1947,26 +1657,29 @@ class AdsbDecoder(QObject):
 				str += "%x, " % (aa)
 		print str
 
+	# Decode the 24 bit PI field
+	def checkParityInterrogator(self, pi, crc):
+		# CL and IC are overlaid with parity
+		par_check = crc ^ pi
+		cl = par_check[17:20].uint		# if 0, IC = IIC (interrogator code), otherwise its an SI code
+		ic = par_check[20:24].uint
+		if ic == 0 and cl == 0:
+			broadcastStr = "Broadcast."
+		else:
+			broadcastStr = ""
+		good = par_check[0:17].uint == 0
+		return (good, ic, cl, broadcastStr)
+
 	# refer to 3.1.2.3.3 and "EUROCONTROL - CRC Calculation for Mode-S Transponders"
 	def calcParity(self, data):
 		# try to speed up the calculation.  It was by far taking the most CPU time
 		if(len(data) == 32):
 			return self.calcParityFast32(data)
 		elif(len(data) == 88):
-			return self.calcParityFast88(data)
+			return self.calcParityFast88(data)	
+		else:
+			return 0		# shouldn't happen
 	
-		# this was the original implementation which was slow
-		poly = bitstring.BitArray(hex='0xFFFA0480')
-		if len(data) < len(poly):
-			print "error: calcParity data must be >= 32 bits long"
-			return bitstring.BitArray(hex='0xFFFFFFFF') 
-
-		for i in range(len(data)):
-			if (data[0]):
-				data[0:32] ^= poly[0:32]
-			data <<= 1
-		return data[0:24]	# return only the 24 MSBs of the result
-
 	def calcParityFast32(self, data):
 		poly = 0xFFFA0480
 		data = data.uint
@@ -1990,6 +1703,67 @@ class AdsbDecoder(QObject):
 			data2 = ((data2<<1)) & 0xFFFFFFFF
 		# return only the 24 MSBs of the result
 		return bitstring.BitArray(uint=(data0>>8), length=24)
+
+	# Alternate parity calculation for testing purposes only
+	# from https://github.com/antirez/dump1090/blob/master/dump1090.c
+	#
+	# Parity table for MODE S Messages.
+	# The table contains 112 elements, every element corresponds to a bit set
+	# in the message, starting from the first bit of actual data after the
+	# preamble.
+	# 
+	# For messages of 112 bit, the whole table is used.
+	# For messages of 56 bits only the last 56 elements are used.
+	# 
+	# The algorithm is as simple as xoring all the elements in this
+	# table
+	# for which the corresponding bit on the message is set to 1.
+	# 
+	# The latest 24 elements in this table are set to 0 as the
+	# checksum at the
+	# end of the message should not affect the computation.
+	# 
+	# Note: this function can be used with DF11 and DF17, other
+	# modes have
+	# the CRC xored with the sender address as they are reply to
+	# interrogations,
+	# but a casual listener can't split the address from the
+	# checksum.
+	# 
+	def calcParityAlternate(self, data):
+		modes_checksum_table = (
+		0x3935ea, 0x1c9af5, 0xf1b77e, 0x78dbbf, 0xc397db, 0x9e31e9, 0xb0e2f0, 0x587178,
+		0x2c38bc, 0x161c5e, 0x0b0e2f, 0xfa7d13, 0x82c48d, 0xbe9842, 0x5f4c21, 0xd05c14,
+		0x682e0a, 0x341705, 0xe5f186, 0x72f8c3, 0xc68665, 0x9cb936, 0x4e5c9b, 0xd8d449,
+		0x939020, 0x49c810, 0x24e408, 0x127204, 0x093902, 0x049c81, 0xfdb444, 0x7eda22,
+		0x3f6d11, 0xe04c8c, 0x702646, 0x381323, 0xe3f395, 0x8e03ce, 0x4701e7, 0xdc7af7,
+		0x91c77f, 0xb719bb, 0xa476d9, 0xadc168, 0x56e0b4, 0x2b705a, 0x15b82d, 0xf52612,
+		0x7a9309, 0xc2b380, 0x6159c0, 0x30ace0, 0x185670, 0x0c2b38, 0x06159c, 0x030ace,
+		0x018567, 0xff38b7, 0x80665f, 0xbfc92b, 0xa01e91, 0xaff54c, 0x57faa6, 0x2bfd53,
+		0xea04ad, 0x8af852, 0x457c29, 0xdd4410, 0x6ea208, 0x375104, 0x1ba882, 0x0dd441,
+		0xf91024, 0x7c8812, 0x3e4409, 0xe0d800, 0x706c00, 0x383600, 0x1c1b00, 0x0e0d80,
+		0x0706c0, 0x038360, 0x01c1b0, 0x00e0d8, 0x00706c, 0x003836, 0x001c1b, 0xfff409,
+		0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000,
+		0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000,
+		0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000, 0x000000 )
+		data = data + bitstring.BitArray(uint=0, length=24)	# append zeros for parity
+		bits = len(data) 
+		crc = 0;
+		if bits == 112:
+			offset = 0
+		else:
+			offset = 112-56
+		j = 0
+		while j<bits:
+			byte = int(j / 8)
+			bit = j % 8
+			bitmask = 1 << (7-bit)
+			d = data[byte*8:(byte+1)*8].uint 
+			if d & bitmask:
+				crc = crc ^ modes_checksum_table[j+offset]
+			j = j + 1
+		return bitstring.BitArray(uint=crc, length=24)	# 24 bit checksum
+
 
 	def lookupCountry(self, aa):
 		# lookup country assigment for an AA
@@ -2510,49 +2284,79 @@ class AdsbDecoder(QObject):
 		#d = (0x8d ,0x86 ,0x91 ,0x44 ,0x58 ,0xbf ,0x04 ,0x71 ,0x79 ,0x68 ,0xaf ,0x1d ,0xba ,0xe2 )
 		#self.decode(d)
 		# testing TIS-B
-		d = (0x95, 0xac, 0x07, 0x6a, 0x99, 0x3c, 0x2f, 0x08, 0xe0, 0x5a, 0x20, 0x47, 0xc7, 0x12)
+		#d = (0x95, 0xac, 0x07, 0x6a, 0x99, 0x3c, 0x2f, 0x08, 0xe0, 0x5a, 0x20, 0x47, 0xc7, 0x12)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x0b, 0x14, 0x68, 0x17, 0xf0, 0xf9, 0x92, 0x30, 0x86, 0x99, 0xe0, 0xec)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x0b, 0x14, 0x68, 0x17, 0xf4, 0x8f, 0x02, 0xdd, 0xca, 0x64, 0x53, 0xc5)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x04, 0x12, 0x68, 0x0f, 0xf1, 0x17, 0x3a, 0x1c, 0xb4, 0xc4, 0x67, 0xb8)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x04, 0x12, 0x99, 0x38, 0x2b, 0x1c, 0x40, 0x6a, 0x20, 0xe1, 0xab, 0x56)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x0f, 0x46, 0x68, 0x13, 0xb4, 0x77, 0xe2, 0xe1, 0x07, 0x9e, 0x54, 0x60)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x03, 0x06, 0x68, 0x07, 0x70, 0xe3, 0x9c, 0x32, 0x2e, 0x77, 0x28, 0x26)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x03, 0x06, 0x68, 0x07, 0x74, 0x79, 0x6a, 0xdf, 0x69, 0xe7, 0x4e, 0xde)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x03, 0x06, 0x99, 0x38, 0x33, 0x87, 0x80, 0x06, 0x20, 0xdd, 0xb1, 0x6b)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x0b, 0x14, 0x99, 0x40, 0x05, 0x0a, 0x60, 0x26, 0x20, 0x79, 0x23, 0x42)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x0b, 0x14, 0x68, 0x19, 0x00, 0xf9, 0xe6, 0x30, 0x8d, 0xc2, 0x14, 0x97)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x04, 0x12, 0x68, 0x11, 0x94, 0xac, 0xf2, 0xca, 0x64, 0x04, 0x20, 0x6b)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x0f, 0x46, 0x68, 0x13, 0xe0, 0xe1, 0xb4, 0x33, 0xe7, 0x21, 0x79, 0x7c)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x03, 0x06, 0x99, 0x38, 0x33, 0x87, 0x60, 0x06, 0x20, 0xf8, 0x31, 0xbd)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x0f, 0x46, 0x68, 0x13, 0xe0, 0xe1, 0x82, 0x33, 0xf0, 0x6a, 0x88, 0x3f)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x0f, 0x46, 0x68, 0x13, 0xe4, 0x77, 0x5a, 0xe1, 0x22, 0x8e, 0xd8, 0x13)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x0f, 0x46, 0x99, 0x38, 0x28, 0x8c, 0x40, 0x2a, 0x20, 0x29, 0x58, 0x78)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x07, 0xe3, 0x68, 0x0d, 0x11, 0x19, 0xd4, 0x17, 0x4d, 0xab, 0xaa, 0x1e)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x07, 0xe3, 0x68, 0x0d, 0x14, 0xae, 0xba, 0xc5, 0x1a, 0x41, 0x64, 0x1d)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x0b, 0x14, 0x68, 0x19, 0x10, 0xfa, 0x14, 0x30, 0x89, 0x6d, 0xeb, 0xf0)
+		##self.decode(d)
+		#d = (0x95, 0xac, 0x0b, 0x14, 0x68, 0x19, 0x14, 0x8f, 0x82, 0xdd, 0xcd, 0xc0, 0xd6, 0xc6)
+		#self.decode(d)
+		#d = (0x95, 0xac, 0x0b, 0x14, 0x99, 0x40, 0x05, 0x0a, 0x60, 0x22, 0x20, 0x41, 0x15, 0x42)
+		#self.decode(d)
+
+		# testing DF16
+		d = (0x80, 0xa1, 0x86, 0x39, 0x58, 0x33, 0x94, 0x99, 0xde, 0xbe, 0x88, 0x96, 0xe6, 0xf0)
 		self.decode(d)
-		d = (0x95, 0xac, 0x0b, 0x14, 0x68, 0x17, 0xf0, 0xf9, 0x92, 0x30, 0x86, 0x99, 0xe0, 0xec)
+		d = (0x80, 0x81, 0x83, 0x17, 0x60, 0x19, 0x78 , 0xd, 0x12, 0x1a, 0xa3, 0x4e, 0x8d, 0xd5)
 		self.decode(d)
-		d = (0x95, 0xac, 0x0b, 0x14, 0x68, 0x17, 0xf4, 0x8f, 0x02, 0xdd, 0xca, 0x64, 0x53, 0xc5)
+		d = (0x80, 0xa1, 0x86, 0x30, 0x58, 0x33, 0x14, 0x98, 0x2e, 0xbf, 0x04, 0x41, 0xec, 0x56)
 		self.decode(d)
-		d = (0x95, 0xac, 0x04, 0x12, 0x68, 0x0f, 0xf1, 0x17, 0x3a, 0x1c, 0xb4, 0xc4, 0x67, 0xb8)
+		d = (0x80, 0x81, 0x83, 0x13, 0x60, 0x19, 0x38, 0xfd, 0xe0, 0x1a, 0x76, 0x90, 0x67, 0xd7)
 		self.decode(d)
-		d = (0x95, 0xac, 0x04, 0x12, 0x99, 0x38, 0x2b, 0x1c, 0x40, 0x6a, 0x20, 0xe1, 0xab, 0x56)
+		d = (0x80, 0xa1, 0x86, 0x1d, 0x58, 0x31, 0xd1, 0x01, 0xfe, 0x11, 0x57, 0x53, 0x47, 0x4b)
 		self.decode(d)
-		d = (0x95, 0xac, 0x0f, 0x46, 0x68, 0x13, 0xb4, 0x77, 0xe2, 0xe1, 0x07, 0x9e, 0x54, 0x60)
+		d = (0x80, 0xa1, 0x85, 0x1c, 0x58, 0x29, 0xc4, 0x94, 0x02, 0xd7, 0x84, 0x9b, 0x02, 0x7d)
 		self.decode(d)
-		d = (0x95, 0xac, 0x03, 0x06, 0x68, 0x07, 0x70, 0xe3, 0x9c, 0x32, 0x2e, 0x77, 0x28, 0x26)
+		d = (0x80, 0x81, 0x83, 0x31, 0x58, 0x1b, 0x11, 0x04, 0x8c, 0x1f, 0x31, 0x94, 0xdc, 0x9b)
 		self.decode(d)
-		d = (0x95, 0xac, 0x03, 0x06, 0x68, 0x07, 0x74, 0x79, 0x6a, 0xdf, 0x69, 0xe7, 0x4e, 0xde)
+		d = (0x80, 0x81, 0x83, 0x15, 0x58, 0x19, 0x51, 0x05, 0x78, 0x1e, 0x12, 0x77, 0xe3, 0x0c)
 		self.decode(d)
-		d = (0x95, 0xac, 0x03, 0x06, 0x99, 0x38, 0x33, 0x87, 0x80, 0x06, 0x20, 0xdd, 0xb1, 0x6b)
+		d = (0x80, 0xa1, 0x83, 0x9f, 0x60, 0x1f, 0x04, 0x9f, 0xe6, 0xcc, 0x5e, 0x3f, 0xd6, 0x0f)
 		self.decode(d)
-		d = (0x95, 0xac, 0x0b, 0x14, 0x99, 0x40, 0x05, 0x0a, 0x60, 0x26, 0x20, 0x79, 0x23, 0x42)
+		d = (0x80, 0xa1, 0x83, 0x95, 0x60, 0x1d, 0x54, 0x9f, 0x24, 0xcd, 0x03, 0xa5, 0x7a, 0x12)
 		self.decode(d)
-		d = (0x95, 0xac, 0x0b, 0x14, 0x68, 0x19, 0x00, 0xf9, 0xe6, 0x30, 0x8d, 0xc2, 0x14, 0x97)
+		d = (0x80, 0x81, 0x83, 0x1f, 0x60, 0x19, 0xf1, 0x08, 0x08, 0x20, 0x38, 0x84, 0xf1, 0x47)
 		self.decode(d)
-		d = (0x95, 0xac, 0x04, 0x12, 0x68, 0x11, 0x94, 0xac, 0xf2, 0xca, 0x64, 0x04, 0x20, 0x6b)
+		d = (0x80, 0x81, 0x00, 0xc4, 0x58, 0x06, 0x48, 0x41, 0x38, 0x08, 0x02, 0x51, 0x9c, 0x22)
 		self.decode(d)
-		d = (0x95, 0xac, 0x0f, 0x46, 0x68, 0x13, 0xe0, 0xe1, 0xb4, 0x33, 0xe7, 0x21, 0x79, 0x7c)
+		d = (0x80, 0xa1, 0x84, 0x9f, 0x60, 0x25, 0xf0, 0xff, 0x8e, 0x25, 0x1b, 0x70, 0x48, 0x73)
 		self.decode(d)
-		d = (0x95, 0xac, 0x03, 0x06, 0x99, 0x38, 0x33, 0x87, 0x60, 0x06, 0x20, 0xf8, 0x31, 0xbd)
-		self.decode(d)
-		d = (0x95, 0xac, 0x0f, 0x46, 0x68, 0x13, 0xe0, 0xe1, 0x82, 0x33, 0xf0, 0x6a, 0x88, 0x3f)
-		self.decode(d)
-		d = (0x95, 0xac, 0x0f, 0x46, 0x68, 0x13, 0xe4, 0x77, 0x5a, 0xe1, 0x22, 0x8e, 0xd8, 0x13)
-		self.decode(d)
-		d = (0x95, 0xac, 0x0f, 0x46, 0x99, 0x38, 0x28, 0x8c, 0x40, 0x2a, 0x20, 0x29, 0x58, 0x78)
-		self.decode(d)
-		d = (0x95, 0xac, 0x07, 0xe3, 0x68, 0x0d, 0x11, 0x19, 0xd4, 0x17, 0x4d, 0xab, 0xaa, 0x1e)
-		self.decode(d)
-		d = (0x95, 0xac, 0x07, 0xe3, 0x68, 0x0d, 0x14, 0xae, 0xba, 0xc5, 0x1a, 0x41, 0x64, 0x1d)
-		self.decode(d)
-		d = (0x95, 0xac, 0x0b, 0x14, 0x68, 0x19, 0x10, 0xfa, 0x14, 0x30, 0x89, 0x6d, 0xeb, 0xf0)
-		self.decode(d)
-		d = (0x95, 0xac, 0x0b, 0x14, 0x68, 0x19, 0x14, 0x8f, 0x82, 0xdd, 0xcd, 0xc0, 0xd6, 0xc6)
-		self.decode(d)
-		d = (0x95, 0xac, 0x0b, 0x14, 0x99, 0x40, 0x05, 0x0a, 0x60, 0x22, 0x20, 0x41, 0x15, 0x42)
+		d = (0x80, 0xa1, 0x84, 0x9e, 0x60, 0x25, 0xf4, 0x94, 0xfa, 0xd2, 0x87, 0xf2, 0xe5, 0x77)
 		self.decode(d)
 		return
 
@@ -2563,5 +2367,6 @@ if __name__ == "__main__":
 			self.args = args
 	args = a
 	args.origin = (37.7, -122.02)
-	d = AdsbDecoder(args)
+	reader = None
+	d = AdsbDecoder(args, reader)
 	d.testPackets()
