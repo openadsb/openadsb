@@ -43,6 +43,7 @@ class DecoderStats:
 		self.uniqueAA = 0
 		self.ACASonly = 0	# AAs that only send ACAS, not other ADS-B
 		self.IICSeen = [False] * 16; # which interrogator codes have we seen 
+		self.lastPressure = 0	# last reported pressure in mbar
 
 # This class parses and decodes the ADS-B messages.
 class AdsbDecoder(QObject):
@@ -519,6 +520,10 @@ class AdsbDecoder(QObject):
 	def DecodeDF16(self, pkt):
 		# Long ACAS air-to-air
 		# 112-bit packet
+		if len(pkt) < 112:
+			print "short DF16 pkt"
+			return
+
 		# FIXME - some of this decoding same as DF0
 		df = pkt[0:5].uint
 		vs = pkt[5:6].uint
@@ -915,12 +920,16 @@ class AdsbDecoder(QObject):
 					vertStr = "%d ft/min (GPS)" % (vrate*64)
 
 			# difference between barometric and geometric altitude
+			diffStr = ""
 			if diff_below:
 				diff *= -1;
-				if diff != 0:
-					diffStr = "Baro-Geo Alt = %d ft" % ((diff-1)*25)
-				else:
-					diffStr = ""
+			if diff != 0:
+				feetDiff = (diff-1)*25
+				baroPressure = (1013.25 + feetDiff/30)		 # is this right?
+				diffStr = "Baro-Geo Alt = %d ft. Calculated barometric %.2f mbar" % (feetDiff, baroPressure)
+			else:
+				baroPressure = 0
+				diffStr = ""
 
 			if crcgood:
 				# store aa, velStr, heading, vertStr
@@ -932,7 +941,9 @@ class AdsbDecoder(QObject):
 				a.setAirborneVel(velStr, heading, vertStr, caStr)		# fixme add diff, true/magnetic
 				if cl == 0:
 					a.setIICSeen(ic)
-				logStr = "Heading %s. %s. %s." %  (headingStr, velStr, vertStr)
+				if baroPressure != 0:
+					self.stats.lastPressure = baroPressure
+				logStr = "Heading %s. %s. %s. %s." %  (headingStr, velStr, vertStr, diffStr)
 				self.emit(SIGNAL("updateAircraft(PyQt_PyObject)"), a)
 
 		elif tc == 28:
@@ -962,12 +973,13 @@ class AdsbDecoder(QObject):
 			elif st == 2:
 				# TCAS RA Broadcast.  See Annex 10, 4.3.8.4.2.2
 				# subtype 1 is contents of register BDS 3,0
+				ara = me[8:22]
 				rac = me[22:26]
 				ra_term = me[26:27].uint
 				multiple = me[27:28]
 				tti = me[28:30].uint
 				identity = me[30:56]
-		
+
 				if multiple:
 					threatStr = "Multiple threats"
 					if ra_term:
@@ -1121,9 +1133,11 @@ class AdsbDecoder(QObject):
 					altStr = "%u ft target" % ((alt-1)*32)
 
 				if baro == 0:
+					mbar = 0
 					baroStr = "Unknown"
 				else:
-					baroStr = "%.1f mbar" % (0.8*(baro-1)+800)
+					mbar = 0.8*(baro-1)+800
+					baroStr = "%.1f mbar" % (mbar)
 
 				if autopilot:
 					targStr += "Autopilot engaged. "
@@ -1140,6 +1154,8 @@ class AdsbDecoder(QObject):
 						a.setFakeICAO24(True)
 					if cl == 0:
 						a.setIICSeen(ic)
+					if mbar != 0:
+						self.stats.lastPressure = mbar
 					# FIXME - update aircraft
 					logStr =  "%s. %s. %s" %  (altStr, baroStr, targStr)
 					print "FIXME - DF17/DF18 %s" % (logStr)

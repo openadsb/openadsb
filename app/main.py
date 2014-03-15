@@ -208,6 +208,7 @@ class MainWindow(QMainWindow):
 		grid.addWidget(QLabel("DF21 (Comm-B Identity Reply):"), 17, 0)
 		grid.addWidget(QLabel("DF Other (Unknown):"), 18, 0)
 		grid.addWidget(QLabel("List of Interrogators:"), 19, 0)
+		grid.addWidget(QLabel("Barometric pressure:"), 20, 0)
 
 		self.rxLevel = QLabel("0")
 		self.totalPkts = QLabel("0")
@@ -224,6 +225,7 @@ class MainWindow(QMainWindow):
 		self.DF20 = QLabel("0")
 		self.DF21 = QLabel("0")
 		self.IICs = QLabel("")
+		self.lastPressure = QLabel("")
 		self.DFOther = QLabel("0")
 		self.badShortPkts = QLabel("0")
 		self.badLongPkts = QLabel("0")
@@ -248,6 +250,7 @@ class MainWindow(QMainWindow):
 		grid.addWidget(self.DF21, 17, 1)
 		grid.addWidget(self.DFOther, 18, 1)
 		grid.addWidget(self.IICs, 19, 1)
+		grid.addWidget(self.lastPressure, 20, 1)
 		statsWindow = QWidget()
 		statsWindow.setLayout(grid)
 
@@ -519,12 +522,13 @@ class MainWindow(QMainWindow):
 		self.DF4.setNum(stats.DF4)
 		self.DF5.setNum(stats.DF5)
 		self.DF11.setNum(stats.DF11)
-		self.DF16.setNum(stats.DF17)
+		self.DF16.setNum(stats.DF16)
 		self.DF17.setNum(stats.DF17)
 		self.DF18.setNum(stats.DF18)
 		self.DF20.setNum(stats.DF20)
 		self.DF21.setNum(stats.DF21)
 		self.DFOther.setNum(stats.DFOther)
+		self.lastPressure.setText("%.2f mbar" % stats.lastPressure)
 
 		ics = ""
 		for (ic,seen) in enumerate(stats.IICSeen):
