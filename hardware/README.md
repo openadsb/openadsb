@@ -11,5 +11,6 @@ packets/sec have been observed.
 For questions or comments, please contact:
 info@openadsb.com
 
-![PCB](./openadsb_pcb.jpg.jpg?raw=true)
+![PCB](./openadsb_pcb.jpg?raw=true)
+
 ![Antenna](./openadsb_antenna.jpg?raw=true)
